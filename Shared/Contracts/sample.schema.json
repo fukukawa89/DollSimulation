@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PoseDoll raw sensor full-frame sample v1",
+  "type": "object",
+  "required": [
+    "protocol",
+    "device_id",
+    "session_id",
+    "profile_id",
+    "profile_sha256",
+    "calibration_id",
+    "calibration_sha256",
+    "type",
+    "sequence",
+    "sender_monotonic_us",
+    "raw_angles_rad",
+    "axis_status"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "posedoll.sensor/1"
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "profile_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "calibration_id": {
+      "type": "string"
+    },
+    "calibration_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "type": {
+      "const": "sample"
+    },
+    "sequence": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "sender_monotonic_us": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "raw_angles_rad": {
+      "type": "array",
+      "items": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 256
+    },
+    "axis_status": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "valid",
+          "missing",
+          "invalid",
+          "fixed"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 256
+    }
+  },
+  "additionalProperties": false
+}

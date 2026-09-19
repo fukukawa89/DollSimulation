@@ -1,0 +1,317 @@
+{
+  "schema_version": "1.0",
+  "calibration_id": "virtual_zero_pi_v1",
+  "profile_id": "virtual_humanoid_44_v1",
+  "profile_sha256": "a7047b7c1bdefaee37acf547d5a823cc2f89d08f5c3e9cd9710a6f6bf79ef224",
+  "status": "synthetic_test_calibration",
+  "axes": [
+    {
+      "axis_id": "pelvis.yaw",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "pelvis.pitch",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "pelvis.roll",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "waist.yaw",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "waist.pitch",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "waist.roll",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "chest.yaw",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "chest.pitch",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "chest.roll",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "head.yaw",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "head.pitch",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "head.roll",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "clavicle_l.protract",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "clavicle_l.elevate",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "upperarm_l.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "upperarm_l.abduct",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "upperarm_l.twist",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "elbow_l.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "forearm_l.twist",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "hand_l.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "hand_l.deviate",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "thigh_l.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "thigh_l.abduct",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "thigh_l.twist",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "calf_l.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "foot_l.dorsiflex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "foot_l.invert",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "ball_l.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "clavicle_r.protract",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "clavicle_r.elevate",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "upperarm_r.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "upperarm_r.abduct",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "upperarm_r.twist",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "elbow_r.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "forearm_r.twist",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "hand_r.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "hand_r.deviate",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "thigh_r.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "thigh_r.abduct",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "thigh_r.twist",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "calf_r.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "foot_r.dorsiflex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "foot_r.invert",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    },
+    {
+      "axis_id": "ball_r.flex",
+      "zero_raw_rad": 3.141592653589793,
+      "sign": 1,
+      "joint_rad_per_sensor_rad": 1.0,
+      "raw_period_rad": 6.283185307179586
+    }
+  ]
+}

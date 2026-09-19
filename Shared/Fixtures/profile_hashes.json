@@ -1,0 +1,5 @@
+{
+  "profile_sha256": "a7047b7c1bdefaee37acf547d5a823cc2f89d08f5c3e9cd9710a6f6bf79ef224",
+  "calibration_sha256": "fe8480bff00c451f3b8eb7e3fab9bf1e65fb422ce482a08cebc7d33ba3f8989f",
+  "hash_rule": "SHA-256 of exact UTF-8 file bytes; regenerate after any edit including whitespace"
+}

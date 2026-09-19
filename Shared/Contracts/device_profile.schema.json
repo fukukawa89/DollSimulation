@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PoseDoll mechanical device profile v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "profile_id",
+    "coordinate_system",
+    "neutral_pose",
+    "nodes",
+    "axes",
+    "axis_order",
+    "anatomical_segments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "coordinate_system": {
+      "type": "object"
+    },
+    "neutral_pose": {
+      "type": "string"
+    },
+    "notes_zh": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "parent",
+          "kind",
+          "parent_to_axis",
+          "axis_to_child"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "fixed",
+              "revolute"
+            ]
+          },
+          "parent_to_axis": {
+            "$ref": "#/$defs/rigid"
+          },
+          "axis_to_child": {
+            "$ref": "#/$defs/rigid"
+          },
+          "axis_id": {
+            "type": "string"
+          },
+          "axis_local": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "revolute"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "axis_id",
+                "axis_local"
+              ]
+            }
+          }
+        ]
+      },
+      "minItems": 1
+    },
+    "axes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "node",
+          "label_zh",
+          "category",
+          "side",
+          "limits_rad",
+          "positive_rule",
+          "mirrored_axis_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          },
+          "label_zh": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "left",
+              "right",
+              "center"
+            ]
+          },
+          "limits_rad": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "positive_rule": {
+            "const": "right_hand_about_axis_local"
+          },
+          "mirrored_axis_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 256
+    },
+    "anatomical_segments": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "end_effectors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "axis_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "rigid": {
+      "type": "object",
+      "required": [
+        "translation_m",
+        "rotation_xyzw"
+      ],
+      "properties": {
+        "translation_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "rotation_xyzw": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

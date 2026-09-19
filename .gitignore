@@ -1,0 +1,61 @@
+# Unreal Engine generated output (including plugin subdirectories)
+Binaries/
+Intermediate/
+DerivedDataCache/
+Saved/
+Build/
+*.dll
+*.pdb
+*.obj
+*.lib
+*.exp
+*.exe
+
+# Source-only repository: local UE assets and captured sequences stay on disk
+/Content/
+*.uasset
+*.umap
+*.ubulk
+*.uexp
+*.pak
+
+# Python environments, packaging and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+.coverage
+htmlcov/
+
+# Generated validation output and local publishing scratch files
+/reports/
+*.log
+*.tmp
+*.bak
+
+# IDE and machine-local configuration
+.vs/
+.idea/
+.vscode/
+*.sln
+*.slnx
+*.suo
+*.user
+*.VC.db
+*.VC.opendb
+.agents/
+.codex/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+Thumbs.db
+.DS_Store

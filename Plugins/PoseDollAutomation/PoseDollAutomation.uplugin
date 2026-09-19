@@ -1,0 +1,12 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "PoseDoll Automation (optional)",
+  "Description": "Low frequency test and inspection tools. PoseDoll runtime does not depend on this plugin or MCP.",
+  "Category": "Editor",
+  "EnabledByDefault": true,
+  "CanContainContent": false,
+  "Modules": [{"Name":"PoseDollAutomation","Type":"Editor","LoadingPhase":"PostEngineInit"}],
+  "Plugins": [{"Name":"PoseDoll","Enabled":true},{"Name":"ToolsetRegistry","Enabled":true},{"Name":"PythonScriptPlugin","Enabled":true}]
+}

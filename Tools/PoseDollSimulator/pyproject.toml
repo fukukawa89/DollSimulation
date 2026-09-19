@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "posedoll-simulator"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = ["numpy", "PySide6", "PyOpenGL", "jsonschema"]
+
+[project.scripts]
+posedoll-simulator = "posedoll_sim.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

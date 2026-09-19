@@ -1,0 +1,248 @@
+{
+  "profile_id": "manny_body_ue582_v1",
+  "status": "VALIDATED_CURATED_TARGET_UE_5_8_2",
+  "mesh": "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple",
+  "rig": "/Game/Characters/Mannequins/Rigs/CR_Mannequin_Body",
+  "source_basis_to_mesh_yaw_degrees": 90,
+  "controls": [
+    {
+      "control": "body_ctrl",
+      "bone": "pelvis",
+      "semantic": "pelvis",
+      "group": "pelvis"
+    },
+    {
+      "control": "spine_01_ctrl",
+      "bone": "spine_02",
+      "semantic": "waist",
+      "from": "pelvis",
+      "weight": 0.5,
+      "group": "torso"
+    },
+    {
+      "control": "spine_02_ctrl",
+      "bone": "spine_03",
+      "semantic": "waist",
+      "group": "torso"
+    },
+    {
+      "control": "spine_03_ctrl",
+      "bone": "spine_04",
+      "semantic": "chest",
+      "group": "torso"
+    },
+    {
+      "control": "neck_01_ctrl",
+      "bone": "neck_01",
+      "semantic": "head",
+      "from": "chest",
+      "weight": 0.3333333333333333,
+      "group": "head"
+    },
+    {
+      "control": "neck_02_ctrl",
+      "bone": "neck_02",
+      "semantic": "head",
+      "from": "chest",
+      "weight": 0.6666666666666666,
+      "group": "head"
+    },
+    {
+      "control": "head_ctrl",
+      "bone": "head",
+      "semantic": "head",
+      "group": "head"
+    },
+    {
+      "control": "clavicle_l_ctrl",
+      "bone": "clavicle_l",
+      "semantic": "clavicle_l",
+      "group": "arm_l"
+    },
+    {
+      "control": "clavicle_r_ctrl",
+      "bone": "clavicle_r",
+      "semantic": "clavicle_r",
+      "group": "arm_r"
+    },
+    {
+      "control": "upperarm_l_fk_ctrl",
+      "bone": "upperarm_l",
+      "semantic": "upperarm_l",
+      "neutral_child": "lowerarm_l",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "arm_l"
+    },
+    {
+      "control": "lowerarm_l_fk_ctrl",
+      "bone": "lowerarm_l",
+      "semantic": "lowerarm_l",
+      "neutral_child": "hand_l",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "arm_l"
+    },
+    {
+      "control": "hand_l_fk_ctrl",
+      "bone": "hand_l",
+      "semantic": "hand_l",
+      "neutral_child": "middle_01_l",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "arm_l"
+    },
+    {
+      "control": "thigh_l_fk_ctrl",
+      "bone": "thigh_l",
+      "semantic": "thigh_l",
+      "neutral_child": "calf_l",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "leg_l"
+    },
+    {
+      "control": "calf_l_fk_ctrl",
+      "bone": "calf_l",
+      "semantic": "calf_l",
+      "neutral_child": "foot_l",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "leg_l"
+    },
+    {
+      "control": "foot_l_fk_ctrl",
+      "bone": "foot_l",
+      "semantic": "foot_l",
+      "neutral_child": "ball_l",
+      "neutral_direction": [
+        0,
+        1,
+        0
+      ],
+      "group": "leg_l"
+    },
+    {
+      "control": "ball_l_fk_ctrl",
+      "bone": "ball_l",
+      "semantic": "ball_l",
+      "group": "leg_l"
+    },
+    {
+      "control": "upperarm_r_fk_ctrl",
+      "bone": "upperarm_r",
+      "semantic": "upperarm_r",
+      "neutral_child": "lowerarm_r",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "arm_r"
+    },
+    {
+      "control": "lowerarm_r_fk_ctrl",
+      "bone": "lowerarm_r",
+      "semantic": "lowerarm_r",
+      "neutral_child": "hand_r",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "arm_r"
+    },
+    {
+      "control": "hand_r_fk_ctrl",
+      "bone": "hand_r",
+      "semantic": "hand_r",
+      "neutral_child": "middle_01_r",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "arm_r"
+    },
+    {
+      "control": "thigh_r_fk_ctrl",
+      "bone": "thigh_r",
+      "semantic": "thigh_r",
+      "neutral_child": "calf_r",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "leg_r"
+    },
+    {
+      "control": "calf_r_fk_ctrl",
+      "bone": "calf_r",
+      "semantic": "calf_r",
+      "neutral_child": "foot_r",
+      "neutral_direction": [
+        0,
+        0,
+        -1
+      ],
+      "group": "leg_r"
+    },
+    {
+      "control": "foot_r_fk_ctrl",
+      "bone": "foot_r",
+      "semantic": "foot_r",
+      "neutral_child": "ball_r",
+      "neutral_direction": [
+        0,
+        1,
+        0
+      ],
+      "group": "leg_r"
+    },
+    {
+      "control": "ball_r_fk_ctrl",
+      "bone": "ball_r",
+      "semantic": "ball_r",
+      "group": "leg_r"
+    }
+  ],
+  "switches": {
+    "arm_l_fk_ik_switch": false,
+    "arm_r_fk_ik_switch": false,
+    "leg_l_fk_ik_switch": false,
+    "leg_r_fk_ik_switch": false,
+    "spine_fk_ik_switch": false,
+    "neck_fk_ik_switch": false,
+    "arm_l_stretch_switch": false,
+    "arm_r_stretch_switch": false,
+    "leg_l_stretch_switch": false,
+    "leg_r_stretch_switch": false,
+    "spine_stretch_switch": false,
+    "arm_l_fk_local": true,
+    "arm_r_fk_local": true,
+    "head_local": true
+  },
+  "notes": [
+    "Discovered from transient runtime probe, not asset-name inference.",
+    "Spine controls drive spine_02/03/04; spine_01 stays with pelvis and spine_05 follows spine_04.",
+    "head_ctrl is world oriented unless explicitly set; global source orientation is applied.",
+    "Twist and corrective helpers remain owned by the native Rig. Fingers/face are excluded."
+  ],
+  "rig_runtime_sha256": "8178edddcdbf500319aa1ce6b548fa9633bfd0ecf244122ecdeacb65d8d8e9f6"
+}

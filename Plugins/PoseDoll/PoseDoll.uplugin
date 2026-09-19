@@ -1,0 +1,43 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "PoseDoll Lab",
+  "Description": "Calibrated full-body sensor input and editable Control Rig pose capture.",
+  "Category": "Animation",
+  "CreatedBy": "PoseDoll Lab",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Modules": [
+    {
+      "Name": "PoseDollCore",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "PoseDollTransport",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "PoseDollRig",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "PoseDollEditor",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "ControlRig",
+      "Enabled": true
+    },
+    {
+      "Name": "LevelSequenceEditor",
+      "Enabled": true
+    }
+  ]
+}

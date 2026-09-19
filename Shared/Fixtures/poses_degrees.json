@@ -1,0 +1,20 @@
+{
+  "description_zh": "可重复的机械通道输入；度数仅供预设UI，协议仍为弧度。",
+  "poses": {
+    "neutral": {},
+    "left_elbow_90": {
+      "elbow_l.flex": 90
+    },
+    "left_shoulder_forward_90": {
+      "upperarm_l.flex": 90
+    },
+    "left_knee_90": {
+      "calf_l.flex": 90
+    },
+    "shoulder_order_test": {
+      "upperarm_l.flex": 40,
+      "upperarm_l.abduct": 30,
+      "upperarm_l.twist": 20
+    }
+  }
+}
