@@ -36,3 +36,11 @@ reports/o4/DELIVERY.json 是软件证据入口，包含精确源文件哈希、�
 test_static_capture_o4.py 和 test_static_reopen_o4.py 只用于专门的隔离测试工程，会建立 /Game/PoseDollO4/<run>/ 测试资产。不要在有未保存工作的编辑器里直接运行这些测试脚本。
 
 硬件实验与 UE 插件分别位于两个仓库。当前硬件 O3 固件仍使用原协议；PDS1 硬件网关适配、STM32 外设驱动和上电/掉电台架测试尚未完成。
+
+## 构建兼容性补充
+
+若旧版报 PoseDollStatic.cpp 的 U64 宏参数过多，这是静态协议解析函数与 OpenSSL 宏在 Unity 合并编译中重名。后续大量类型/语法错误是该首错的连锁反应。已改用专用函数名，不需要更换 SDK。
+
+隔离工程的自适应独立编译不能覆盖提交后的合并编译。回归时可运行 Scripts/BuildPoseDoll.ps1 -VerifyUnity，强制合并编译并关闭自适应排除；正常构建仍可使用原命令。
+
+2026-09-24 已在实际 DollSimulation 项目验证强制 Unity 构建成功，生成的插件 DLL 通过 4 组 PoseDoll 原生自动化测试。日志位于本机 reports/o4/unity_fix/；本补充不改写 O4 首次交付时的源码包与证据。

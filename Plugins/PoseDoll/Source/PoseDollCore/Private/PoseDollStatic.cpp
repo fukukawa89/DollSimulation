@@ -3,7 +3,7 @@
 namespace PoseDoll
 {
 static bool Bad(FString& E,const FString& M){E=M;return false;}
-static bool U64(const FJsonObject& O,const TCHAR* Key,uint64& V)
+static bool TryReadStaticUInt64String(const FJsonObject& O,const TCHAR* Key,uint64& V)
 {
     FString S;if(!O.TryGetStringField(Key,S)||S.IsEmpty()||S.Len()>20||(S.Len()>1&&S[0]=='0'))return false;
     V=0;for(TCHAR C:S){if(C<'0'||C>'9'||V>(MAX_uint64-uint64(C-'0'))/10)return false;V=V*10+C-'0';}return true;
@@ -41,9 +41,9 @@ TSharedRef<FJsonObject> StaticCommand(const FProfile& P,const FStaticIdentity& I
 }
 bool ParseStatic(const FProfile& P,const FStaticIdentity& ID,const FJsonObject& O,FStaticMessage& M,FString& E)
 {
-    if(!Equals(O,TEXT("protocol"),TEXT("PDS1/1"))||!Equals(O,TEXT("device_id"),ID.Source.Device)||!Equals(O,TEXT("gateway_boot"),ID.Source.Session)||!Equals(O,TEXT("profile_sha256"),P.Hash)||!Equals(O,TEXT("calibration_sha256"),P.CalibrationHash)||!O.TryGetStringField(TEXT("capture_id"),M.CaptureId)||M.CaptureId.IsEmpty()||M.CaptureId.Len()>128||!O.TryGetStringField(TEXT("type"),M.Type)||!U64(O,TEXT("request_start_us"),M.RequestStart)||!Strings(O,TEXT("source_boots"),M.Boots)||M.Boots!=ID.Boots)return Bad(E,TEXT("PDS1 request/source/profile changed"));
+    if(!Equals(O,TEXT("protocol"),TEXT("PDS1/1"))||!Equals(O,TEXT("device_id"),ID.Source.Device)||!Equals(O,TEXT("gateway_boot"),ID.Source.Session)||!Equals(O,TEXT("profile_sha256"),P.Hash)||!Equals(O,TEXT("calibration_sha256"),P.CalibrationHash)||!O.TryGetStringField(TEXT("capture_id"),M.CaptureId)||M.CaptureId.IsEmpty()||M.CaptureId.Len()>128||!O.TryGetStringField(TEXT("type"),M.Type)||!TryReadStaticUInt64String(O,TEXT("request_start_us"),M.RequestStart)||!Strings(O,TEXT("source_boots"),M.Boots)||M.Boots!=ID.Boots)return Bad(E,TEXT("PDS1 request/source/profile changed"));
     if(M.Type==TEXT("accepted"))return O.Values.Num()==9||Bad(E,TEXT("PDS1 ack fields"));
-    if(M.Type!=TEXT("scan")||O.Values.Num()!=15||!U64(O,TEXT("scan_id"),M.ScanId)||M.ScanId==0||!U64(O,TEXT("start_us"),M.Start)||!U64(O,TEXT("end_us"),M.End))return Bad(E,TEXT("PDS1 scan fields"));
+    if(M.Type!=TEXT("scan")||O.Values.Num()!=15||!TryReadStaticUInt64String(O,TEXT("scan_id"),M.ScanId)||M.ScanId==0||!TryReadStaticUInt64String(O,TEXT("start_us"),M.Start)||!TryReadStaticUInt64String(O,TEXT("end_us"),M.End))return Bad(E,TEXT("PDS1 scan fields"));
     double D=0;if(!O.TryGetNumberField(TEXT("duration_us"),D)||!FMath::IsFinite(D)||D<1||D>MAX_uint32||FMath::FloorToDouble(D)!=D||M.Start<M.RequestStart||M.End<=M.Start||M.End-M.Start!=uint64(D))return Bad(E,TEXT("PDS1 duration/range"));M.Duration=uint32(D);
     const TArray<TSharedPtr<FJsonValue>> *Raw=nullptr,*Status=nullptr;
     if(!O.TryGetArrayField(TEXT("raw_angles_rad"),Raw)||!O.TryGetArrayField(TEXT("axis_status"),Status)||Raw->Num()!=44||Status->Num()!=44)return Bad(E,TEXT("PDS1 complete 44-slot pose required"));
