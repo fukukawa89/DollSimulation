@@ -3,6 +3,7 @@
 #include "HAL/Runnable.h"
 #include "HAL/RunnableThread.h"
 #include "PoseDollCore.h"
+#include "PoseDollStatic.h"
 
 namespace PoseDoll
 {
@@ -10,6 +11,8 @@ struct FTransportSnapshot
 {
     FString State=TEXT("Disconnected"), Error;
     FIdentity Identity;
+    FStaticIdentity StaticIdentity;
+    bool bStatic=false;
     FSample Latest;
     uint64 Generation=0, Received=0, Rejected=0;
     bool bConnected=false, bHasSample=false;
@@ -24,6 +27,8 @@ public:
     void Stop() override;
     uint32 Run() override;
     FTransportSnapshot Snapshot() const;
+    bool StaticRequest(const FString& CaptureId,const FString& Type);
+    TArray<FStaticMessage> DrainStatic();
 private:
     void SetError(const FString& Error);
     FProfile Profile;
@@ -32,5 +37,7 @@ private:
     TUniquePtr<FRunnableThread> Thread;
     mutable FCriticalSection Mutex;
     FTransportSnapshot State;
+    TArray<TSharedRef<FJsonObject>> Commands;
+    TArray<FStaticMessage> StaticMessages;
 };
 }

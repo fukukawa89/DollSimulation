@@ -98,6 +98,13 @@ public:
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("Clutch 相对编辑"),TEXT("resume"),TEXT("clutch"))]
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("冻结"),TEXT("freeze"))]
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("断开"),TEXT("disconnect"))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
+            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("连接静态源"),TEXT("connect"),TEXT("static"))]
+            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("采集当前姿势"),TEXT("snapshot"))]
+            +SHorizontalBox::Slot().AutoWidth().Padding(6,0)[SNew(SButton).Text(FText::FromString(TEXT("采集并写入当前帧"))).OnClicked_Lambda([this]{PoseDoll::FSession::Get().RequestSnapshot(true,0,Linear);return FReply::Handled();})]
+            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("静态 Clutch"),TEXT("snapshot_clutch"))]
+            +SHorizontalBox::Slot().AutoWidth().Padding(6,0)[Button(TEXT("取消采集"),TEXT("snapshot_cancel"))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(STextBlock).AutoWrapText(true).Text_Lambda([]{return FText::FromString(PoseDoll::FSession::Get().SnapshotLabel());})]
         +SVerticalBox::Slot().FillHeight(1).Padding(4)[SNew(SPoseViewport)]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("绑定所选角色 / 当前序列"),TEXT("bind_selection"))]
@@ -169,12 +176,14 @@ class FPoseDollEditorModule : public IModuleInterface
     FTSTicker::FDelegateHandle TickHandle;
     FDelegateHandle ReplacedHandle;
     FDelegateHandle ModifiedHandle;
+    FDelegateHandle UndoHandle;
 public:
     virtual void StartupModule() override
     {
         TickHandle=FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float Dt){return PoseDoll::FSession::Get().Tick(Dt);}));
         ReplacedHandle=FCoreUObjectDelegates::OnObjectsReplaced.AddLambda([](const TMap<UObject*,UObject*>& Replaced){auto& S=PoseDoll::FSession::Get();if(S.Adapter && (Replaced.Contains(S.Adapter->GetRig()) || Replaced.Contains(S.Adapter->GetRig()->GetClass()) || Replaced.Contains(S.Component.Get()))){S.Shutdown();S.State=TEXT("Fault");S.Error=TEXT("Target/Rig was recompiled or replaced; rebind and validate before resuming");}});
-        ModifiedHandle=FCoreUObjectDelegates::OnObjectModified.AddLambda([](UObject* Object){auto& S=PoseDoll::FSession::Get();if(S.Adapter && Object==S.Adapter->GetRig()->GetClass()->ClassGeneratedBy){S.Shutdown();S.State=TEXT("Fault");S.Error=TEXT("Target Rig asset changed; rebind and validate before resuming");}});
+        UndoHandle=FEditorDelegates::PostUndoRedo.AddLambda([]{PoseDoll::FSession::Get().AfterUndoRedo();});
+        ModifiedHandle=FCoreUObjectDelegates::OnObjectModified.AddLambda([](UObject* Object){auto& S=PoseDoll::FSession::Get();S.ObserveObjectModified(Object);if(S.Adapter && Object==S.Adapter->GetRig()->GetClass()->ClassGeneratedBy){S.Shutdown();S.State=TEXT("Fault");S.Error=TEXT("Target Rig asset changed; rebind and validate before resuming");}});
         FGlobalTabmanager::Get()->RegisterNomadTabSpawner(TEXT("PoseDollLab"),FOnSpawnTab::CreateLambda([](const FSpawnTabArgs&){return SNew(SDockTab).TabRole(ETabRole::NomadTab)[SNew(SPosePanel)];})).SetDisplayName(FText::FromString(TEXT("PoseDoll Lab")));
         UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this,&FPoseDollEditorModule::RegisterMenus));
     }
@@ -185,7 +194,7 @@ public:
     }
     virtual void ShutdownModule() override
     {
-        FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);FCoreUObjectDelegates::OnObjectsReplaced.Remove(ReplacedHandle);FCoreUObjectDelegates::OnObjectModified.Remove(ModifiedHandle);UToolMenus::UnRegisterStartupCallback(this);UToolMenus::UnregisterOwner(this);FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(TEXT("PoseDollLab"));PoseDoll::FSession::Get().Shutdown();
+        FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);FCoreUObjectDelegates::OnObjectsReplaced.Remove(ReplacedHandle);FCoreUObjectDelegates::OnObjectModified.Remove(ModifiedHandle);FEditorDelegates::PostUndoRedo.Remove(UndoHandle);UToolMenus::UnRegisterStartupCallback(this);UToolMenus::UnregisterOwner(this);FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(TEXT("PoseDollLab"));PoseDoll::FSession::Get().Shutdown();
     }
 };
 IMPLEMENT_MODULE(FPoseDollEditorModule,PoseDollEditor)

@@ -47,13 +47,22 @@ void FTcpSource::Start(uint16 InPort)
 }
 void FTcpSource::Stop() { bStop=true; }
 FTransportSnapshot FTcpSource::Snapshot() const { FScopeLock Guard(&Mutex);return State; }
+bool FTcpSource::StaticRequest(const FString& CaptureId,const FString& Type)
+{
+    FScopeLock Guard(&Mutex);
+    if(!State.bConnected||!State.bStatic||Commands.Num()>=8)return false;
+    if(Type==TEXT("request"))StaticMessages.Reset();
+    Commands.Add(StaticEnvelope(StaticCommand(Profile,State.StaticIdentity,CaptureId,Type)));return true;
+}
+TArray<FStaticMessage> FTcpSource::DrainStatic()
+{FScopeLock Guard(&Mutex);TArray<FStaticMessage> Out=MoveTemp(StaticMessages);StaticMessages.Reset();return Out;}
 void FTcpSource::SetError(const FString& Error) {FScopeLock Guard(&Mutex);State.Error=Error;++State.Rejected;}
 uint32 FTcpSource::Run()
 {
     ISocketSubsystem* Subsystem=ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
     while (!bStop)
     {
-        {FScopeLock Guard(&Mutex);State.State=TEXT("Connecting");State.bConnected=false;State.bHasSample=false;}
+        {FScopeLock Guard(&Mutex);State.State=TEXT("Connecting");State.bConnected=false;State.bHasSample=false;State.bStatic=false;Commands.Reset();StaticMessages.Reset();}
         FSocket* Socket=Subsystem->CreateSocket(NAME_Stream,TEXT("PoseDoll loopback"),false);
         if (!Socket) {SetError(TEXT("Socket creation failed"));return 1;}
         Socket->SetNonBlocking(true);Socket->SetNoDelay(true);
@@ -65,11 +74,15 @@ uint32 FTcpSource::Run()
         {
             if (Socket->Wait(ESocketWaitConditions::WaitForWrite,FTimespan::FromMilliseconds(50)) && Socket->GetConnectionState()==SCS_Connected) {Connected=true;break;}
         }
-        TArray<uint8> Buffer; FIdentity ID; bool Welcomed=false,Alive=Connected;
+        TArray<uint8> Buffer; FIdentity ID; FStaticIdentity StaticID; bool StaticMode=false; bool Welcomed=false,Alive=Connected;
         uint64 LastSequence=0,LastTime=0;bool HaveSequence=false;
         double RateWindow=FPlatformTime::Seconds(),PartialSince=RateWindow;int32 MessageCount=0;
         while (!bStop && Alive)
         {
+            TArray<TSharedRef<FJsonObject>> PendingCommands;
+            {FScopeLock Guard(&Mutex);PendingCommands=MoveTemp(Commands);Commands.Reset();}
+            for(const auto& Command:PendingCommands)if(!SendObject(Socket,Command)){SetError(TEXT("PDS1 command send failed"));Alive=false;break;}
+            if(!Alive)break;
             if (!Socket->Wait(ESocketWaitConditions::WaitForRead,FTimespan::FromMilliseconds(20)))
             {
                 if ((!Welcomed || Buffer.Num()>0) && FPlatformTime::Seconds()-PartialSince>3) {SetError(TEXT("Handshake/partial frame timeout"));break;}
@@ -96,15 +109,28 @@ uint32 FTcpSource::Run()
                 if (!Parsed) {SetError(Error);Alive=false;break;}
                 if (!Welcomed)
                 {
-                    if (!Handshake(Profile,*Object,ID,Error))
+                    FString Type;Object->TryGetStringField(TEXT("type"),Type);StaticMode=Type==TEXT("pds1");
+                    TSharedPtr<FJsonObject> Payload;
+                    const bool Accepted=StaticMode?(UnwrapStatic(*Object,Payload,Error)&&StaticHello(Profile,*Payload,StaticID,Error)):Handshake(Profile,*Object,ID,Error);
+                    if(StaticMode)ID=StaticID.Source;
+                    if (!Accepted)
                     {
                         auto Reject=MakeShared<FJsonObject>();Reject->SetStringField(TEXT("type"),TEXT("reject"));Reject->SetStringField(TEXT("code"),Error);SendObject(Socket,Reject);SetError(Error);Alive=false;break;
                     }
-                    auto Welcome=MakeShared<FJsonObject>();Welcome->SetStringField(TEXT("type"),TEXT("welcome"));Welcome->SetStringField(TEXT("protocol"),TEXT("posedoll.sensor/1"));Welcome->SetStringField(TEXT("session_id"),ID.Session);Welcome->SetBoolField(TEXT("accepted"),true);Welcome->SetStringField(TEXT("receiver"),TEXT("PoseDoll/UE5.8"));Welcome->SetNumberField(TEXT("max_frame_bytes"),65536);
+                    auto Welcome=MakeShared<FJsonObject>();Welcome->SetStringField(TEXT("type"),TEXT("welcome"));Welcome->SetStringField(TEXT("protocol"),StaticMode?TEXT("PDS1/1"):TEXT("posedoll.sensor/1"));Welcome->SetStringField(TEXT("session_id"),ID.Session);Welcome->SetBoolField(TEXT("accepted"),true);Welcome->SetStringField(TEXT("receiver"),TEXT("PoseDoll/UE5.8"));Welcome->SetNumberField(TEXT("max_frame_bytes"),65536);
                     if (!SendObject(Socket,Welcome)) {Alive=false;break;}
                     Welcomed=true;
-                    {FScopeLock Guard(&Mutex);State.Identity=ID;State.bConnected=true;State.State=TEXT("Ready");State.Error.Reset();++State.Generation;}
+                    {FScopeLock Guard(&Mutex);State.Identity=ID;State.StaticIdentity=StaticID;State.bStatic=StaticMode;State.bConnected=true;State.State=TEXT("Ready");State.Error.Reset();++State.Generation;}
                     continue;
+                }
+                if(StaticMode)
+                {
+                    TSharedPtr<FJsonObject> Payload;FStaticMessage M;
+                    if(!UnwrapStatic(*Object,Payload,Error)||!ParseStatic(Profile,StaticID,*Payload,M,Error)){SetError(Error);Alive=false;break;}
+                    M.Sample.ReceivedSeconds=Now;
+                    {FScopeLock Guard(&Mutex);if(StaticMessages.Num()>=32){State.Error=TEXT("PDS1 queue overflow; transaction invalidated");++State.Rejected;Alive=false;}
+                    else{StaticMessages.Add(MoveTemp(M));++State.Received;}}
+                    if(!Alive)break;continue;
                 }
                 FSample Sample;
                 if (!ParseSample(Profile,ID,*Object,Sample,Error)) {SetError(Error);Alive=false;break;}

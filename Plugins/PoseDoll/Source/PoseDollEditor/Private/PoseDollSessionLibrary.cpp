@@ -12,7 +12,7 @@ FString UPoseDollEditorLibrary::SessionCommand(const FString& Action,const FStri
     auto& S=PoseDoll::FSession::Get();bool Ok=true;
     if (Action==TEXT("key_report")) return S.KeyReport();
     if (Action==TEXT("pose_report")) return S.PoseReport();
-    if (Action==TEXT("connect")) Ok=S.Connect();
+    if (Action==TEXT("connect")) Ok=S.Connect(Argument==TEXT("static")?39178:39177);
     else if (Action==TEXT("disconnect")) S.Disconnect();
     else if (Action==TEXT("resume")) Ok=S.Resume(Argument==TEXT("clutch"));
     else if (Action==TEXT("freeze")) S.Freeze();
@@ -23,6 +23,13 @@ FString UPoseDollEditorLibrary::SessionCommand(const FString& Action,const FStri
         const TArray<FString> Masks={TEXT("FullBody"),TEXT("UpperBody"),TEXT("arm_l"),TEXT("arm_r"),TEXT("leg_l"),TEXT("leg_r")};
         Ok=Masks.Contains(Argument);if (Ok) S.SetMask(Argument);else S.Error=TEXT("Unknown mask");
     }
+    else if(Action==TEXT("snapshot")||Action==TEXT("snapshot_capture")||Action==TEXT("snapshot_clutch"))
+    {
+        int32 Advance=0;bool Linear=false;TSharedPtr<FJsonObject> O;FString E;
+        if(!Argument.IsEmpty()&&!PoseDoll::ReadJson(Argument,O,E)){Ok=false;S.Error=E;}
+        else{if(O){O->TryGetNumberField(TEXT("advance"),Advance);O->TryGetBoolField(TEXT("linear"),Linear);}Ok=S.RequestSnapshot(Action==TEXT("snapshot_capture"),Advance,Linear,Action==TEXT("snapshot_clutch"));}
+    }
+    else if(Action==TEXT("snapshot_cancel"))S.CancelSnapshot();
     else if (Action==TEXT("capture"))
     {
         TSharedPtr<FJsonObject> O;FString Error;
@@ -50,7 +57,7 @@ FString UPoseDollEditorLibrary::SessionCommand(const FString& Action,const FStri
         {
             double X=0,Y=0,Z=0,Yaw=0,Pitch=0,Roll=0;
             O->TryGetNumberField(TEXT("x_cm"),X);O->TryGetNumberField(TEXT("y_cm"),Y);O->TryGetNumberField(TEXT("z_cm"),Z);O->TryGetNumberField(TEXT("yaw_deg"),Yaw);O->TryGetNumberField(TEXT("pitch_deg"),Pitch);O->TryGetNumberField(TEXT("roll_deg"),Roll);
-            S.Placement=FTransform(FRotator(Pitch,Yaw,Roll),FVector(X,Y,Z));
+            S.InvalidateSnapshotContext();S.Placement=FTransform(FRotator(Pitch,Yaw,Roll),FVector(X,Y,Z));
         }
     }
     else if (Action==TEXT("tick")) S.Tick(0);

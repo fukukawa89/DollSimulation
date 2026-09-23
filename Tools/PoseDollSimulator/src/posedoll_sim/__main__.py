@@ -10,14 +10,18 @@ from .transport import SensorServer
 def main():
     parser=argparse.ArgumentParser(description='PoseDoll 44-channel raw sensor simulator')
     parser.add_argument('--shared',type=Path,default=default_shared())
-    parser.add_argument('--port',type=int,default=39177)
+    parser.add_argument('--port',type=int)
+    parser.add_argument('--static',action='store_true',help='PDS1 request-driven snapshots; default port 39178')
     parser.add_argument('--headless',action='store_true')
     parser.add_argument('--seconds',type=float,default=0)
     parser.add_argument('--fixture',type=Path)
     parser.add_argument('--screenshot',type=Path)
     args=parser.parse_args()
     profile=DeviceProfile(args.shared)
-    server=SensorServer(profile,args.port)
+    if args.static:
+        from .static_transport import StaticSensorServer
+        server=StaticSensorServer(profile,args.port or 39178)
+    else:server=SensorServer(profile,args.port or 39177)
     if args.fixture:
         decoder=SensorDecoder(profile)
         decoder.handshake(json.loads((args.shared/'Fixtures/hello.json').read_text(encoding='utf-8')))

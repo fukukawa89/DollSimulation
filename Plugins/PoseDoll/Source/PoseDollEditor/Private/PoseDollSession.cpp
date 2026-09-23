@@ -17,6 +17,7 @@
 #include "ScopedTransaction.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/DateTime.h"
 
 namespace PoseDoll
 {
@@ -53,16 +54,16 @@ void FSession::Shutdown()
     RigCompiledHandle.Reset();RigAsset.Reset();
     Disconnect();Adapter.Reset();Sequence.Reset();Component.Reset();Track.Reset();Binding.Invalidate();Contacts.Reset();
 }
-bool FSession::Connect()
+bool FSession::Connect(uint16 Port)
 {
     if (!Initialize()) return false;
-    Disconnect();Input=MakeUnique<FTcpSource>(Profile);Input->Start();State=TEXT("Connecting");Error.Empty();return true;
+    Disconnect();Input=MakeUnique<FTcpSource>(Profile);Input->Start(Port);State=TEXT("Connecting");Error.Empty();return true;
 }
 void FSession::Disconnect()
 {
-    bLive=false;bValid=false;bFixture=false;Input.Reset();Decoder.Reset();Generation=0;LastSequence=MAX_uint64;State=TEXT("Disconnected");
+    CancelSnapshot(TEXT("Disconnected"));CommittedSnapshots.Reset();bLive=false;bValid=false;bFixture=false;Input.Reset();Decoder.Reset();Generation=0;LastSequence=MAX_uint64;State=TEXT("Disconnected");
 }
-void FSession::Freeze() {bLive=false;State=TEXT("Frozen");}
+void FSession::Freeze() {if(!bStaticCommit)CancelSnapshot();bLive=false;State=TEXT("Frozen");}
 void FSession::SetMask(const FString& InMask) {Freeze();SnapshotBaseline();Mask=InMask;bValid=false;}
 bool FSession::IsMasked(const FControlMap& M) const
 {
@@ -89,6 +90,8 @@ void FSession::SnapshotBaseline()
 bool FSession::Resume(bool Clutch)
 {
     if (!Input || !Input->Snapshot().bConnected) {Error=TEXT("Connect a simulator before Resume");return false;}
+    if(Input->Snapshot().bStatic){Error=TEXT("PDS1 source: use static snapshot controls");return false;}
+    CancelSnapshot(TEXT("Switching to Live"));
     if (Sequence.IsValid() && !ValidateTarget(false)) return false;
     bClutch=Clutch;SnapshotBaseline();Decoder.Reset();LastSequence=MAX_uint64;bLive=true;bFixture=false;bValid=false;
     if (Clutch)
@@ -104,7 +107,8 @@ bool FSession::Apply(const FSample& Sample,const FIdentity& Identity)
 {
     const double Begin=FPlatformTime::Seconds();
     DiagnosticSample=Sample;
-    if (!Decoder.Decode(Profile,Identity,Sample,Q,Error) || !Profile.Forward(Q,SourcePose,Error) || !Adapter->Apply(Profile,SourcePose,RawPose,Error)) {++Invalid;bValid=false;State=TEXT("Stale");return false;}
+    FStaticMessage AbsoluteMessage;AbsoluteMessage.Sample=Sample;
+    if (!(bApplyingStatic?DecodeAbsolute(Profile,AbsoluteMessage,Q,Error):Decoder.Decode(Profile,Identity,Sample,Q,Error)) || !Profile.Forward(Q,SourcePose,Error) || !Adapter->Apply(Profile,SourcePose,RawPose,Error)) {++Invalid;bValid=false;State=TEXT("Stale");return false;}
     Pose=RawPose;ApplyMode();
     if (!Adapter->Constrain(Contacts,Pose,Error)) {bValid=false;State=TEXT("Fault");return false;}
     LastSample=Sample;LastIdentity=Identity;bValid=true;LastValidSeconds=FPlatformTime::Seconds();++Applied;
@@ -133,8 +137,9 @@ bool FSession::Tick(float)
 {
     if (!Input) return true;
     const auto S=Input->Snapshot();const double Now=FPlatformTime::Seconds();
-    if (S.Generation!=Generation) {Generation=S.Generation;Decoder.Reset();LastSequence=MAX_uint64;bLive=false;bValid=false;State=TEXT("Ready");}
-    if (!S.bConnected) {bLive=false;bValid=false;State=S.State;Error=S.Error;return true;}
+    if (S.Generation!=Generation) {CancelSnapshot(TEXT("Source session changed"));Generation=S.Generation;Decoder.Reset();LastSequence=MAX_uint64;bLive=false;bValid=false;State=TEXT("Ready");}
+    if (!S.bConnected) {CancelSnapshot(TEXT("Source disconnected"));bLive=false;bValid=false;State=S.State;Error=S.Error;return true;}
+    if(S.bStatic)return TickStatic(S,Now);
     if (bLive && Binding.IsValid() && !ValidateTarget(false)) {bLive=false;bValid=false;State=TEXT("Fault");return true;}
     if (bLive && bClutch && Sequence.IsValid() && ULevelSequenceEditorBlueprintLibrary::GetGlobalPosition().Frame.FrameNumber.Value!=ClutchFrame) {Freeze();bValid=false;Error=TEXT("Timeline changed; start a new Clutch baseline");return true;}
     if (bLive && S.bHasSample && S.Latest.Sequence!=LastSequence)
@@ -149,7 +154,7 @@ bool FSession::LoadFixture(const FString& Filename)
 {
     if (FPaths::GetCleanFilename(Filename)!=Filename || !Filename.EndsWith(TEXT(".sample.json"))) {Error=TEXT("Fixture must be a bundled sample filename");return false;}
     if (!Initialize()) return false;
-    bLive=false;bClutch=false;Decoder.Reset();TSharedPtr<FJsonObject> Hello,Raw;FIdentity ID;FSample Sample;
+    CancelSnapshot(TEXT("Loading fixture"));bSnapshotEligible=false;bLive=false;bClutch=false;Decoder.Reset();TSharedPtr<FJsonObject> Hello,Raw;FIdentity ID;FSample Sample;
     const FString Root=FPaths::ProjectDir()/TEXT("Shared/Fixtures");
     if (!LoadJson(Root/TEXT("hello.json"),Hello,Error) || !Handshake(Profile,*Hello,ID,Error) || !LoadJson(Root/Filename,Raw,Error) || !ParseSample(Profile,ID,*Raw,Sample,Error)) return false;
     Sample.ReceivedSeconds=FPlatformTime::Seconds();bFixture=true;
@@ -188,7 +193,18 @@ bool FSession::Bind(ULevelSequence* InSequence,USkeletalMeshComponent* InCompone
         }
         else if (T->GetClass()->GetName().Contains(TEXT("SkeletalAnimation"))) {Error=TEXT("Binding has an animation track; select an isolated PoseDoll target");return false;}
     }
+    bRigNeedsRebuild=Track.IsValid();
     BoundActorTransform=InComponent->GetOwner()->GetActorTransform();Placement=FTransform::Identity;Contacts.Reset();SnapshotBaseline();Error.Empty();return true;
+}
+void FSession::AfterUndoRedo()
+{
+    bRigNeedsRebuild=true;InvalidateSnapshotContext();
+    if (!Sequence.IsValid())return;
+    const FMovieSceneBinding* Bound=Sequence->GetMovieScene()->FindBinding(Binding);
+    Track.Reset();
+    if (Bound)for(auto* T:Bound->GetTracks())
+        if(auto* CR=Cast<UMovieSceneControlRigParameterTrack>(T))
+            if(CR->GetDisplayName().ToString()==TEXT("PoseDoll / Manny"))Track=CR;
 }
 bool FSession::BindSelection()
 {
@@ -201,9 +217,15 @@ bool FSession::BindSelection()
 }
 bool FSession::Capture(int32 Frame,int32 Advance,bool Linear)
 {
+    if(StaticWindow.Pending()){Error=TEXT("Wait for the current static request");return false;}
+    if(!bFixture&&Input&&Input->Snapshot().bStatic&&!bSnapshotEligible){Error=TEXT("Request a new complete snapshot before Capture");return false;}
+    const bool StaticCapture=bSnapshotEligible;
+    if(StaticCapture && SnapshotSubFrame!=0){Error=TEXT("Choose a whole display frame before requesting a capture");return false;}
+    if(StaticCapture && (CommittedSnapshots.Contains(HistoricalSnapshot.CaptureId)||!StaticContextMatches()||Frame!=SnapshotFrame)) {Error=TEXT("Snapshot already committed or capture context changed; request again");return false;}
     if (!Pose.bContactsReachable) {Error=FString::Printf(TEXT("Contact unreachable: %.3f cm residual; capture refused (no stretching)"),Pose.ContactPositionErrorCm);return false;}
-    if (!bValid || (!bFixture && (FPlatformTime::Seconds()-LastValidSeconds>.25))) {Error=TEXT("Capture requires a fresh, complete, valid pose");return false;}
+    if (!bValid || (!bFixture && !StaticCapture && (FPlatformTime::Seconds()-LastValidSeconds>.25))) {Error=TEXT("Capture requires a fresh, complete, valid pose");return false;}
     if (!ValidateTarget(true)) return false;
+    TGuardValue<bool> StaticCommitGuard(bStaticCommit,StaticCapture);
     Freeze();const FPoseResult Frozen=Pose;UMovieScene* Movie=Sequence->GetMovieScene();
     UMovieScene3DTransformTrack* PlacementTrack=nullptr;
     for (auto* T:Movie->FindBinding(Binding)->GetTracks()) if (auto* P=Cast<UMovieScene3DTransformTrack>(T))
@@ -228,6 +250,16 @@ bool FSession::Capture(int32 Frame,int32 Advance,bool Linear)
             const FMovieSceneBindingProxy Proxy(Binding,Sequence.Get());
             Track=Cast<UMovieSceneControlRigParameterTrack>(UControlRigSequencerEditorLibrary::FindOrCreateControlRigTrack(Component->GetWorld(),Sequence.Get(),Adapter->GetRig()->GetClass(),Proxy));
             if (Track.IsValid()) {Track->Modify();Track->SetDisplayName(FText::FromString(TEXT("PoseDoll / Manny")));}
+        }
+        if (bRigNeedsRebuild && Track.IsValid())
+        {
+            // The managed instance restored by track Undo/Redo can retain stale hierarchy
+            // caches. Replace only its runtime; section keys and masks stay intact.
+            Track->Modify();for(auto* S:Track->GetAllSections())S->Modify();
+            auto* Fresh=NewObject<UControlRig>(Track.Get(),Adapter->GetRig()->GetClass(),NAME_None,RF_Transactional);
+            Fresh->SetObjectBinding(Track->GetControlRig()->GetObjectBinding());
+            Fresh->Initialize();Fresh->RequestConstruction();Fresh->Evaluate_AnyThread();
+            Track->ReplaceControlRig(Fresh,false);bRigNeedsRebuild=false;
         }
         auto* Section=Track.IsValid() && Track->GetAllSections().Num()==1?Cast<UMovieSceneControlRigParameterSection>(Track->GetAllSections()[0]):nullptr;
         if (!Section) {Success=false;Failure=TEXT("Could not create a unique Control Rig section");}
@@ -286,6 +318,11 @@ bool FSession::Capture(int32 Frame,int32 Advance,bool Linear)
             Section->MarkAsChanged();ULevelSequenceEditorBlueprintLibrary::RefreshCurrentLevelSequence();
             ULevelSequenceEditorBlueprintLibrary::SetGlobalPosition(FMovieSceneSequencePlaybackParams(FFrameTime(Frame),EUpdatePositionMethod::Jump));
             UControlRig* Target=Track->GetControlRig();
+            for (const auto& Pair:Frozen.Switches)
+            {
+                if (Mask==TEXT("FullBody") && Target->GetControlValue(Pair.Key).Get<bool>()!=Pair.Value)
+                {Success=false;Failure=TEXT("Sequence switch readback failed: ")+Pair.Key.ToString();break;}
+            }
             for (FName Name:Names)
             {
                 // Read the actual sequencer-owned rig after forced evaluation; do not create
@@ -301,7 +338,7 @@ bool FSession::Capture(int32 Frame,int32 Advance,bool Linear)
                 const FTransform Expected=Frozen.Bones[M.Bone];
                 const double RotationError=FMath::RadiansToDegrees(Read.GetRotation().AngularDistance(Expected.GetRotation()));
                 const double PositionError=FVector::Distance(Read.GetLocation(),Expected.GetLocation());
-                if (RotationError>.5 || PositionError>.1) {Success=false;Failure=FString::Printf(TEXT("Bone readback %s: %.4f deg, %.4f cm"),*M.Bone.ToString(),RotationError,PositionError);}
+                if (RotationError>.5 || PositionError>.1) {UE_LOG(LogTemp, Error,TEXT("PoseDoll %s actual=%s expected=%s"),*M.Bone.ToString(),*Read.ToString(),*Expected.ToString());Success=false;Failure=FString::Printf(TEXT("Bone readback %s: %.4f deg, %.4f cm"),*M.Bone.ToString(),RotationError,PositionError);}
             }
         }
     }
@@ -311,9 +348,17 @@ bool FSession::Capture(int32 Frame,int32 Advance,bool Linear)
         for (const auto& P:UControlRigSequencerEditorLibrary::GetControlRigs(Sequence.Get())) if (P.Proxy.BindingID==Binding && P.Track->GetDisplayName().ToString()==TEXT("PoseDoll / Manny")) Track=P.Track;
         return false;
     }
-    ++Captures;State=TEXT("Frozen");Error.Empty();
+    ++Captures;State=StaticCapture?TEXT("SnapshotCommitted"):TEXT("Frozen");Error.Empty();
+    if(StaticCapture){CommittedSnapshots.Add(HistoricalSnapshot.CaptureId);bSnapshotEligible=false;StaticWindow.State=TEXT("Committed");}
     if (Advance) ULevelSequenceEditorBlueprintLibrary::SetGlobalPosition(FMovieSceneSequencePlaybackParams(FFrameTime(Frame+Advance),EUpdatePositionMethod::Jump));
     auto Record=MakeShared<FJsonObject>();Record->SetStringField(TEXT("profile_sha256"),Profile.Hash);Record->SetStringField(TEXT("calibration_sha256"),Profile.CalibrationHash);Record->SetStringField(TEXT("target_profile"),Adapter->ProfileId);Record->SetStringField(TEXT("sequence"),Sequence->GetPathName());Record->SetStringField(TEXT("binding"),Binding.ToString());Record->SetStringField(TEXT("mask"),Mask);Record->SetStringField(TEXT("mode"),bClutch?TEXT("Clutch"):TEXT("Absolute"));Record->SetNumberField(TEXT("display_frame"),Frame);
+    if(StaticCapture)
+    {
+        Record->SetStringField(TEXT("input_mode"),TEXT("PDS1/1 Snapshot"));Record->SetStringField(TEXT("capture_id"),HistoricalSnapshot.CaptureId);Record->SetStringField(TEXT("captured_utc"),SnapshotCapturedUtc);Record->SetStringField(TEXT("source_kind"),SnapshotSourceKind);
+        Record->SetStringField(TEXT("source_start_us"),FString::Printf(TEXT("%llu"),HistoricalSnapshot.Start));Record->SetStringField(TEXT("source_end_us"),FString::Printf(TEXT("%llu"),HistoricalSnapshot.End));
+        Record->SetNumberField(TEXT("scan_span_us"),HistoricalSnapshot.Duration);Record->SetNumberField(TEXT("stable_observation_us"),StaticWindow.StableMicros);
+        TArray<TSharedPtr<FJsonValue>> Boots;for(const auto& Boot:HistoricalSnapshot.Boots)Boots.Add(MakeShared<FJsonValueString>(Boot));Record->SetArrayField(TEXT("source_boots"),Boots);
+    }
     TArray<TSharedPtr<FJsonValue>> Angles;for (double V:Q) Angles.Add(MakeShared<FJsonValueNumber>(V));Record->SetArrayField(TEXT("q_radians"),Angles);
     Record->SetStringField(TEXT("type"),TEXT("posedoll.capture/1"));Record->SetStringField(TEXT("rig_runtime_sha256"),Adapter->Fingerprint);Record->SetStringField(TEXT("device"),LastIdentity.Device);Record->SetStringField(TEXT("session"),LastIdentity.Session);Record->SetStringField(TEXT("capability"),LastIdentity.Capability);Record->SetStringField(TEXT("sequence_number"),FString::Printf(TEXT("%llu"),LastSample.Sequence));
     TArray<TSharedPtr<FJsonValue>> Raw,Statuses;
@@ -330,12 +375,14 @@ bool FSession::Capture(int32 Frame,int32 Advance,bool Linear)
 FString FSession::StatusJson() const
 {
     auto O=MakeShared<FJsonObject>();O->SetStringField(TEXT("state"),State);O->SetStringField(TEXT("error"),Error);O->SetBoolField(TEXT("valid"),bValid);O->SetBoolField(TEXT("live"),bLive);O->SetNumberField(TEXT("applied"),Applied);O->SetNumberField(TEXT("invalid"),Invalid);O->SetNumberField(TEXT("captures"),Captures);O->SetStringField(TEXT("mask"),Mask);O->SetStringField(TEXT("sequence"),Sequence.IsValid()?Sequence->GetPathName():TEXT(""));O->SetStringField(TEXT("binding"),Binding.ToString());
+    O->SetStringField(TEXT("snapshot_state"),StaticWindow.State);O->SetStringField(TEXT("capture_id"),StaticWindow.CaptureId);O->SetBoolField(TEXT("has_snapshot"),bHasSnapshot);O->SetBoolField(TEXT("snapshot_eligible"),bSnapshotEligible);O->SetStringField(TEXT("snapshot_captured_utc"),SnapshotCapturedUtc);O->SetNumberField(TEXT("snapshot_target_frame"),SnapshotFrame);O->SetNumberField(TEXT("snapshot_stable_us"),StaticWindow.StableMicros);O->SetNumberField(TEXT("snapshot_peak_deg"),StaticWindow.PeakDegrees);O->SetNumberField(TEXT("snapshot_drift_deg_s"),StaticWindow.DriftDegreesPerSecond);
+    if(bHasSnapshot){O->SetNumberField(TEXT("snapshot_age_ms"),(FPlatformTime::Seconds()-HistoricalReceived)*1000);O->SetStringField(TEXT("snapshot_scan_id"),FString::Printf(TEXT("%llu"),HistoricalSnapshot.ScanId));}
     O->SetBoolField(TEXT("contacts_reachable"),Pose.bContactsReachable);O->SetNumberField(TEXT("contact_position_error_cm"),Pose.ContactPositionErrorCm);O->SetNumberField(TEXT("contact_rotation_error_deg"),Pose.ContactRotationErrorDegrees);O->SetBoolField(TEXT("pole_degenerate"),Pose.bPoleDegenerate);O->SetNumberField(TEXT("contacts"),Contacts.Num());
     if (LastValidSeconds>0) O->SetNumberField(TEXT("sample_age_ms"),(FPlatformTime::Seconds()-LastValidSeconds)*1000);
     auto P95=[](TArray<double> Values){Values.Sort();return Values.Num()?Values[FMath::Min(Values.Num()-1,FMath::FloorToInt(Values.Num()*.95))]:0;};
     O->SetNumberField(TEXT("processing_p95_ms"),P95(ProcessingTimes));O->SetNumberField(TEXT("receive_to_apply_p95_ms"),P95(ReceiveLatency));
     O->SetNumberField(TEXT("preview_frames"),PreviewFrames);O->SetNumberField(TEXT("main_thread_with_preview_p95_ms"),P95(MainThreadTimes));O->SetNumberField(TEXT("receive_to_preview_p95_ms"),P95(PreviewLatency));
-    if (Input) {const auto S=Input->Snapshot();O->SetNumberField(TEXT("received"),S.Received);O->SetNumberField(TEXT("rejected"),S.Rejected);O->SetStringField(TEXT("session"),S.Identity.Session);}
+    if (Input) {const auto S=Input->Snapshot();O->SetNumberField(TEXT("received"),S.Received);O->SetNumberField(TEXT("rejected"),S.Rejected);O->SetStringField(TEXT("session"),S.Identity.Session);O->SetBoolField(TEXT("static_source"),S.bStatic);}
     return JsonString(O);
 }
 void FSession::RecordPreview(double DurationMs)
@@ -387,6 +434,7 @@ FString FSession::KeyReport() const
 }
 bool FSession::Contact(const FString& Chain,bool Enabled,bool LockRotation,const FVector* GoalPosition)
 {
+    CancelSnapshot(TEXT("Contact settings changed"));
     if (!Enabled) {Contacts.Remove(Chain);return true;}
     const TMap<FString,FName> Ends={{TEXT("arm_l"),TEXT("hand_l")},{TEXT("arm_r"),TEXT("hand_r")},{TEXT("leg_l"),TEXT("foot_l")},{TEXT("leg_r"),TEXT("foot_r")}};
     if (!Ends.Contains(Chain) || !bValid || !Pose.Bones.Contains(Ends[Chain])) {Error=TEXT("A valid preview pose is required before locking a hand/foot");return false;}

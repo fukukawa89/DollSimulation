@@ -17,6 +17,7 @@ class SimulatorWindow(QMainWindow):
     def __init__(self, profile, server):
         super().__init__()
         self.profile,self.server=profile,server
+        self.static_mode=hasattr(server,'static_fault')
         self.q=dict.fromkeys(profile.order,0.0)
         self.controls={}
         self.selected='elbow_l.flex'
@@ -29,7 +30,7 @@ class SimulatorWindow(QMainWindow):
         self.scan_start=time.monotonic()
         self.last_mechanical=0
         self.mechanical_diagnostic=''
-        self.setWindowTitle('PoseDoll Lab · 全身传感器人偶模拟器')
+        self.setWindowTitle('PoseDoll Lab · '+('静态采集模拟器 · 41 路 + 3 固定槽' if self.static_mode else '全身传感器人偶模拟器'))
         self.resize(1560,980)
         container=QWidget(); self.setCentralWidget(container)
         root=QVBoxLayout(container)
@@ -64,6 +65,8 @@ class SimulatorWindow(QMainWindow):
         for label,fn in [('中立复位',self.neutral),('镜像姿势',self.mirror)]:
             button=QPushButton(label);button.clicked.connect(fn);row.addWidget(button)
         self.variant=QComboBox();self.variant.addItems(['Full44 · 完整 44 轴','Body35 · 9 轴机械锁定']);self.variant.currentIndexChanged.connect(self.change_variant);left.addWidget(self.variant)
+        if self.static_mode:
+            self.variant.clear();self.variant.addItem('Static41 · 骨盆 3 槽固定');self.variant.setEnabled(False)
         middle=QVBoxLayout();body.addLayout(middle,1)
         self.axis_label=QLabel();middle.addWidget(self.axis_label)
         self.view=DollView(profile);self.view.axis_selected.connect(self.select);self.view.angle_dragged.connect(self.set_angle);middle.addWidget(self.view,1)
@@ -79,8 +82,13 @@ class SimulatorWindow(QMainWindow):
         for label,attribute,maximum in [('噪声 σ（度）','noise_degrees',10),('原始零偏（度）','bias_degrees',180),('量化步长（度）','quantum_degrees',30)]:
             spin=QDoubleSpinBox();spin.setDecimals(2);spin.setRange(-maximum if attribute=='bias_degrees' else 0,maximum);spin.setSingleStep(.1)
             spin.valueChanged.connect(lambda value,key=attribute:setattr(server.faults,key,value));form.addRow(label,spin)
-        for label,attribute in [('传感器卡死','stuck'),('当前轴缺失','missing'),('暂停数据流','paused'),('重复序号','duplicate_sequence'),('过期序号','stale_sequence'),('强制 TCP 分包','fragment'),('合并两帧发送（粘包）','coalesce')]:
+        for label,attribute in [('传感器卡死','stuck'),('当前轴缺失','missing'),('暂停采样','paused'),('重复序号','duplicate_sequence'),('过期序号','stale_sequence'),('强制 TCP 分包','fragment'),('合并两帧发送（粘包）','coalesce')]:
+            if self.static_mode and attribute in ('duplicate_sequence','stale_sequence','coalesce'):continue
             check=QCheckBox(label);check.toggled.connect(lambda value,key=attribute:setattr(server.faults,key,value));form.addRow(check)
+        if self.static_mode:
+            faults_choice=QComboBox();faults_choice.addItems(['正常','CRC 错误','传感器缺失','传感器故障','节点重启','远端重启','重复扫描','请求错配','超时'])
+            modes=['','crc','missing','fault','node_restart','satellite_restart','duplicate_scan','wrong_request','timeout']
+            faults_choice.currentIndexChanged.connect(lambda i:setattr(server,'static_fault',modes[i]));form.addRow('采集事务故障',faults_choice)
         self.scan=QCheckBox('连续扫动当前轴');form.addRow(self.scan)
         self.fault_view=QCheckBox('三维显示本地反解姿势');form.addRow(self.fault_view)
         self.table=QTableWidget(44,4);self.table.setHorizontalHeaderLabels(['关节','理想°','raw°','反解°']);self.table.verticalHeader().hide();self.table.setFixedWidth(395)
@@ -91,7 +99,7 @@ class SimulatorWindow(QMainWindow):
             self.table.setItem(i,0,QTableWidgetItem(profile.axes[aid]['label_zh']))
             for col in range(1,4):self.table.setItem(i,col,QTableWidgetItem('0'))
         self.table.cellClicked.connect(lambda row,col:self.select(profile.order[row]));right.addWidget(self.table,1)
-        note=QLabel('反解值为模拟器本地诊断。\nUE 的独立校准结果在插件面板查看。');note.setStyleSheet('color:#97acc0');right.addWidget(note)
+        note=QLabel('反解值为模拟器本地诊断。\nUE 的独立校准结果在插件面板查看。'+('\n空闲时保留上次读数，UE 点击静态采集才请求新扫描。' if self.static_mode else ''));note.setStyleSheet('color:#97acc0');right.addWidget(note)
         self.status=QLabel();self.status.setWordWrap(True);root.addWidget(self.status)
         self.setStyleSheet('QMainWindow,QWidget{background:#17212d;color:#dce6f1} QGroupBox{border:1px solid #354655;border-radius:5px;margin-top:10px;padding:6px} QGroupBox::title{subcontrol-origin:margin;left:9px} QPushButton,QComboBox,QDoubleSpinBox{background:#273848;border:1px solid #46576a;padding:6px;border-radius:4px} QPushButton:hover{background:#36536b} QTableWidget{background:#13202b;gridline-color:#2b3d4d} QHeaderView::section,QTabBar::tab{background:#243546;padding:7px} QTabBar::tab:selected{background:#39617e} QSlider::groove:horizontal{height:5px;background:#394d61} QSlider::handle:horizontal{background:#6fc5ed;width:12px;margin:-4px 0;border-radius:5px}')
         self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(33)
@@ -105,6 +113,7 @@ class SimulatorWindow(QMainWindow):
 
     def set_angle(self,aid,value):
         if self.updating:return
+        if self.static_mode and aid in self.profile.order[:3]:return
         if self.server.body35 and aid in self.profile.fixed:return
         lo,hi=self.profile.axes[aid]['limits_rad']
         self.q[aid]=max(lo,min(hi,value))
@@ -115,8 +124,9 @@ class SimulatorWindow(QMainWindow):
     def refresh(self):
         self.updating=True
         if self.server.body35:self.q.update(self.profile.fixed)
+        if self.static_mode:self.q.update(dict.fromkeys(self.profile.order[:3],0.0))
         for aid,(spin,slider,box) in self.controls.items():
-            spin.setValue(math.degrees(self.q[aid]));slider.setValue(round(math.degrees(self.q[aid])*10));box.setEnabled(not(self.server.body35 and aid in self.profile.fixed))
+            spin.setValue(math.degrees(self.q[aid]));slider.setValue(round(math.degrees(self.q[aid])*10));box.setEnabled(not((self.server.body35 and aid in self.profile.fixed) or (self.static_mode and aid in self.profile.order[:3])))
         self.updating=False
         self.server.set_pose(self.q)
         self.view.q=dict(self.decoded if self.fault_view.isChecked() else self.q);self.view.update()
@@ -132,6 +142,7 @@ class SimulatorWindow(QMainWindow):
         self.refresh()
 
     def change_variant(self,index):
+        if self.static_mode:return
         self.server.body35=bool(index);self.restart();self.refresh()
 
     def restart(self):
@@ -164,7 +175,7 @@ class SimulatorWindow(QMainWindow):
         if self.scan.isChecked():
             lo,hi=self.profile.axes[self.selected]['limits_rad'];q=(lo+hi)/2+(hi-lo)*.45*math.sin((time.monotonic()-self.scan_start)*.8)
             self.set_angle(self.selected,q)
-        if not self.server.state.startswith('已连接') and not self.server.faults.paused:
+        if not self.static_mode and not self.server.state.startswith('已连接') and not self.server.faults.paused:
             self.server.snapshot()
         latest=self.server.latest
         if latest and (latest['sequence'],latest['session_id'])!=self.last_sequence:
@@ -176,6 +187,7 @@ class SimulatorWindow(QMainWindow):
         for row,aid in enumerate(self.profile.order):
             self.table.item(row,1).setText(f'{math.degrees(self.q[aid]):.1f}')
             raw=latest['raw_angles_rad'][row] if latest else None
+            if self.static_mode and row<3:raw=None
             self.table.item(row,2).setText('—' if raw is None else f'{math.degrees(raw):.1f}')
             self.table.item(row,3).setText(f'{math.degrees(self.decoded[aid]):.1f}')
         self.connection.setText(self.server.state+'  |  已发送 '+str(self.server.sent))
