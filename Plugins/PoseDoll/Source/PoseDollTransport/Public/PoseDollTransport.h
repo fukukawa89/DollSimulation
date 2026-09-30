@@ -14,7 +14,7 @@ struct FTransportSnapshot
     FStaticIdentity StaticIdentity;
     bool bStatic=false;
     FSample Latest;
-    uint64 Generation=0, Received=0, Rejected=0;
+    uint64 Generation=0, Received=0, Rejected=0, RetiredReplies=0;
     bool bConnected=false, bHasSample=false;
 };
 
@@ -37,6 +37,7 @@ private:
     TUniquePtr<FRunnableThread> Thread;
     mutable FCriticalSection Mutex;
     FTransportSnapshot State;
+    FStaticRouter StaticRouter;
     TArray<TSharedRef<FJsonObject>> Commands;
     TArray<FStaticMessage> StaticMessages;
 };

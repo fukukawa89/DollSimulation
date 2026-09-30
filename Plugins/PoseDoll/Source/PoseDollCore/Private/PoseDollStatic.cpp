@@ -63,6 +63,41 @@ bool DecodeAbsolute(const FProfile& P,const FStaticMessage& M,TArray<double>& Q,
     FProfile StaticProfile=P;StaticProfile.CapabilityId=TEXT("pds1_full41_root3");StaticProfile.FixedAxes.Reset();for(int32 I=0;I<3;++I)StaticProfile.FixedAxes.Add(I,0);
     FDecoder D;FIdentity ID;ID.Capability=StaticProfile.CapabilityId;return D.Decode(StaticProfile,ID,M.Sample,Q,E);
 }
+void FStaticRouter::Reset()
+{
+    Active.Reset();
+    Retired.Reset();
+}
+void FStaticRouter::Prune(double Now)
+{
+    Retired.RemoveAll([Now](const FRetired& Item) { return Now >= Item.Expires; });
+}
+bool FStaticRouter::Begin(const FString& Id, double Now)
+{
+    Prune(Now);
+    if (Id.IsEmpty() || Id.Len() > 128 || Id == Active ||
+        Retired.ContainsByPredicate([&Id](const FRetired& Item) { return Item.Id == Id; })) return false;
+    const FString Previous = Active;
+    Retire(Previous, Now);
+    Active = Id;
+    return true;
+}
+void FStaticRouter::Retire(const FString& Id, double Now)
+{
+    Prune(Now);
+    if (Id.IsEmpty() || Id != Active) return; // Repeated cancel/ack cannot extend lifetime.
+    if (Retired.Num() == MaxRetired) Retired.RemoveAt(0);
+    Retired.Add({Id, Now + RetiredSeconds});
+    Active.Reset();
+}
+EStaticRoute FStaticRouter::Route(const FString& Id, double Now)
+{
+    Prune(Now);
+    if (!Active.IsEmpty() && Id == Active) return EStaticRoute::Active;
+    if (Retired.ContainsByPredicate([&Id](const FRetired& Item) { return Item.Id == Id; }))
+        return EStaticRoute::Retired;
+    return EStaticRoute::Unexpected;
+}
 void FStaticWindow::Begin(const FString& Id,double Wall)
 {*this=FStaticWindow();CaptureId=Id;Started=Wall;State=TEXT("Requested");}
 void FStaticWindow::Cancel(){Window.Reset();Angles.Reset();State=TEXT("Cancelled");}

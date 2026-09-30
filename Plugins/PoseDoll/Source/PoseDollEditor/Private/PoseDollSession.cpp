@@ -382,7 +382,7 @@ FString FSession::StatusJson() const
     auto P95=[](TArray<double> Values){Values.Sort();return Values.Num()?Values[FMath::Min(Values.Num()-1,FMath::FloorToInt(Values.Num()*.95))]:0;};
     O->SetNumberField(TEXT("processing_p95_ms"),P95(ProcessingTimes));O->SetNumberField(TEXT("receive_to_apply_p95_ms"),P95(ReceiveLatency));
     O->SetNumberField(TEXT("preview_frames"),PreviewFrames);O->SetNumberField(TEXT("main_thread_with_preview_p95_ms"),P95(MainThreadTimes));O->SetNumberField(TEXT("receive_to_preview_p95_ms"),P95(PreviewLatency));
-    if (Input) {const auto S=Input->Snapshot();O->SetNumberField(TEXT("received"),S.Received);O->SetNumberField(TEXT("rejected"),S.Rejected);O->SetStringField(TEXT("session"),S.Identity.Session);O->SetBoolField(TEXT("static_source"),S.bStatic);}
+    if (Input) {const auto S=Input->Snapshot();O->SetNumberField(TEXT("received"),S.Received);O->SetNumberField(TEXT("rejected"),S.Rejected);O->SetNumberField(TEXT("retired_replies"),S.RetiredReplies);O->SetStringField(TEXT("session"),S.Identity.Session);O->SetBoolField(TEXT("static_source"),S.bStatic);}
     return JsonString(O);
 }
 void FSession::RecordPreview(double DurationMs)

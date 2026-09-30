@@ -51,7 +51,14 @@ bool FTcpSource::StaticRequest(const FString& CaptureId,const FString& Type)
 {
     FScopeLock Guard(&Mutex);
     if(!State.bConnected||!State.bStatic||Commands.Num()>=8)return false;
-    if(Type==TEXT("request"))StaticMessages.Reset();
+    const double Now=FPlatformTime::Seconds();
+    if(Type==TEXT("request"))
+    {
+        if(!StaticRouter.Begin(CaptureId,Now))return false;
+        StaticMessages.Reset();
+    }
+    else if(Type==TEXT("cancel")||Type==TEXT("ack"))StaticRouter.Retire(CaptureId,Now);
+    else return false;
     Commands.Add(StaticEnvelope(StaticCommand(Profile,State.StaticIdentity,CaptureId,Type)));return true;
 }
 TArray<FStaticMessage> FTcpSource::DrainStatic()
@@ -62,7 +69,7 @@ uint32 FTcpSource::Run()
     ISocketSubsystem* Subsystem=ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
     while (!bStop)
     {
-        {FScopeLock Guard(&Mutex);State.State=TEXT("Connecting");State.bConnected=false;State.bHasSample=false;State.bStatic=false;Commands.Reset();StaticMessages.Reset();}
+        {FScopeLock Guard(&Mutex);State.State=TEXT("Connecting");State.bConnected=false;State.bHasSample=false;State.bStatic=false;Commands.Reset();StaticMessages.Reset();StaticRouter.Reset();}
         FSocket* Socket=Subsystem->CreateSocket(NAME_Stream,TEXT("PoseDoll loopback"),false);
         if (!Socket) {SetError(TEXT("Socket creation failed"));return 1;}
         Socket->SetNonBlocking(true);Socket->SetNoDelay(true);
@@ -128,7 +135,12 @@ uint32 FTcpSource::Run()
                     TSharedPtr<FJsonObject> Payload;FStaticMessage M;
                     if(!UnwrapStatic(*Object,Payload,Error)||!ParseStatic(Profile,StaticID,*Payload,M,Error)){SetError(Error);Alive=false;break;}
                     M.Sample.ReceivedSeconds=Now;
-                    {FScopeLock Guard(&Mutex);if(StaticMessages.Num()>=32){State.Error=TEXT("PDS1 queue overflow; transaction invalidated");++State.Rejected;Alive=false;}
+                    // ParseStatic above rejects malformed or changed-identity retired packets too.
+                    {FScopeLock Guard(&Mutex);
+                    const EStaticRoute Route=StaticRouter.Route(M.CaptureId,Now);
+                    if(Route==EStaticRoute::Retired)++State.RetiredReplies;
+                    else if(Route==EStaticRoute::Unexpected){State.Error=TEXT("Unknown PDS1 capture ID");++State.Rejected;Alive=false;}
+                    else if(StaticMessages.Num()>=32){State.Error=TEXT("PDS1 queue overflow; transaction invalidated");++State.Rejected;Alive=false;}
                     else{StaticMessages.Add(MoveTemp(M));++State.Received;}}
                     if(!Alive)break;continue;
                 }

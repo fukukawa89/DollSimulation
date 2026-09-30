@@ -59,6 +59,71 @@ def absolute(profile,raw,status):
     return out
 
 
+def validate_reply(profile, h, p):
+    """Full wire validation precedes routing, including for retired transactions."""
+    if set(p) not in (ACK, SCAN) or any(p.get(k) != h[k] for k in IDENTITY):
+        raise ValueError('PDS1 identity/fields')
+    if type(p.get('capture_id')) is not str or not 1 <= len(p['capture_id']) <= 128 or p.get('source_boots') != h['source_boots']:
+        raise ValueError('PDS1 capture/boot')
+    req = uint64(p['request_start_us'])
+    if p['type'] == 'accepted' and set(p) == ACK:
+        return
+    if p['type'] != 'scan' or set(p) != SCAN:
+        raise ValueError('PDS1 reply type')
+    start, end, sid = (uint64(p[k]) for k in ('start_us', 'end_us', 'scan_id'))
+    duration = p['duration_us']
+    if not sid or type(duration) is not int or not 1 <= duration <= 2**32-1 or not req <= start < end or end-start != duration:
+        raise ValueError('PDS1 duration/range')
+    raw, status = p['raw_angles_rad'], p['axis_status']
+    if type(raw) is not list or type(status) is not list or len(raw) != 44 or len(status) != 44 or raw[:3] != [None]*3 or status[:3] != ['fixed']*3:
+        raise ValueError('PDS1 fixed root layout')
+    for i, aid in enumerate(profile.order[3:], 3):
+        if status[i] != 'valid' or type(raw[i]) not in (float, int) or not math.isfinite(raw[i]) or not 0 <= raw[i] < profile.cal[aid]['raw_period_rad']:
+            raise ValueError('PDS1 missing/fault/raw')
+
+
+class StaticRouter:
+    """Connection-local bounded retired IDs. Unknown IDs remain errors."""
+    MAX_RETIRED = 32
+    RETIRED_SECONDS = 30.0
+
+    def __init__(self, profile, h):
+        self.profile, self.hello = profile, h
+        self.active = None
+        self.retired = {}
+        self.dropped = 0
+
+    def _prune(self, now):
+        self.retired = {k:v for k,v in self.retired.items() if now < v}
+
+    def begin(self, capture, now):
+        self._prune(now)
+        if type(capture) is not str or not 1 <= len(capture) <= 128 or capture == self.active or capture in self.retired:
+            raise ValueError('PDS1 reused capture ID')
+        self.retire(self.active, now)
+        self.active = capture
+
+    def retire(self, capture, now):
+        self._prune(now)
+        if not capture or capture != self.active:
+            return
+        if len(self.retired) == self.MAX_RETIRED:
+            del self.retired[next(iter(self.retired))]
+        self.retired[capture] = now + self.RETIRED_SECONDS
+        self.active = None
+
+    def route(self, message, now):
+        p = unwrap(message)
+        validate_reply(self.profile, self.hello, p)
+        self._prune(now)
+        if p['capture_id'] == self.active:
+            return p
+        if p['capture_id'] in self.retired:
+            self.dropped += 1
+            return None
+        raise ValueError('Unknown PDS1 capture ID')
+
+
 class StaticWindow:
     """Independent oracle for C++ semantics; simulated source clocks must be explicit."""
     def __init__(self,profile,hello,capture_id,wall_start):

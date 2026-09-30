@@ -44,6 +44,9 @@ Rig 层级、控制器与参考变换须符合 `Shared/Profiles/manny_body_ue582
 
 ## 文档与验证
 
+- [本次静态采集恢复提交与审查入口](Docs/O5_COMMIT_REVIEW.zh-CN.md)
+- [PDS1 静态采集协议](Docs/PDS1_PROTOCOL.md)与[迟到回复处理说明](Docs/O5_RECOVERY.zh-CN.md)
+
 - [完整使用说明](README_PoseDoll.md)：功能、操作和支持范围；其中示例地图、序列及报告路径指原本地验收工程，不随源码上传。
 - [架构说明](ARCHITECTURE_PoseDoll.md)
 - Python 测试：`Tools/PoseDollSimulator/tests`

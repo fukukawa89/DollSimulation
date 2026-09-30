@@ -24,3 +24,9 @@ To avoid assuming clock synchronization, UE bounds final age by:
 This is conservative because request transport time is included. Reject an interval whose source end lies >5ms beyond elapsed UE time. Device clock rate accuracy and trustworthy source timestamp placement remain hardware obligations.
 
 PDR4, the candidate satellite byte codec, is distinct. Its request/response sizes are 68/80 bytes. Host C and Python crosschecks do not implement the gateway CAN coordinator, join challenge or STM32 drivers. Boot/reset/retry/power behavior must be qualified before hardware deployment.
+
+## O5 bounded retired transaction routing
+
+Transport validates the full envelope, identity and message schema before dispatching by capture ID. A known cancelled/completed capture is retired for at most 30 seconds in a FIFO of at most 32 IDs. Valid late replies for those IDs are counted and dropped before the active stability window. Unknown, expired or evicted IDs remain errors. Invalid CRC/status/boot/profile data remains an error even when its capture ID was retired. Repeated cancel/ack does not extend retirement; reconnect clears it.
+
+This changes routing, not the PDS1/1 wire format or stability/age thresholds. See `O5_RECOVERY.zh-CN.md` for executed tests. The design repository's O5 bridge uses a separate PDG5/1 request-driven serial format; legacy PD41 cached samples are not eligible PDS1 static measurements.
