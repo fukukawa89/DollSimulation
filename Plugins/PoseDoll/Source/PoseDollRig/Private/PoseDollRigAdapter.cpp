@@ -20,7 +20,11 @@ bool FCuratedAdapter::Initialize(UClass* Class,USkeletalMesh* Mesh,const FString
     Component.Reset(NewObject<USkeletalMeshComponent>(GetTransientPackage(),NAME_None,RF_Transient));Component->SetSkeletalMeshAsset(Mesh);
     Rig.Reset(NewObject<UControlRig>(GetTransientPackage(),Class,NAME_None,RF_Transient));
     auto Binding=MakeShared<FControlRigObjectBinding>();Binding->BindToObject(Component.Get());Rig->SetObjectBinding(Binding);
-    Rig->Initialize();Rig->RequestConstruction();Rig->Evaluate_AnyThread();
+    Rig->Initialize();
+    bool bUseTargetMeshReference=false;
+    Config->TryGetBoolField(TEXT("use_target_mesh_reference"),bUseTargetMeshReference);
+    if (bUseTargetMeshReference) Rig->SetBoneInitialTransformsFromSkeletalMesh(Mesh);
+    Rig->RequestConstruction();Rig->Evaluate_AnyThread();
     URigHierarchy* H=Rig->GetHierarchy();
     FString Signature;
     for (const auto& Key:H->GetAllKeys())
