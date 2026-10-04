@@ -4,6 +4,8 @@
 #include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Text/STextBlock.h"
@@ -89,50 +91,53 @@ public:
         auto* Performance=GetMutableDefault<UEditorPerformanceSettings>();
         bPreviousBackgroundThrottle=Performance->bThrottleCPUWhenNotForeground;
         Performance->bThrottleCPUWhenNotForeground=false;
-        for (const TCHAR* M:{TEXT("FullBody"),TEXT("UpperBody"),TEXT("arm_l"),TEXT("arm_r"),TEXT("leg_l"),TEXT("leg_r")}) Masks.Add(MakeShared<FString>(M));
+        for (const TCHAR* M:{TEXT("FullBody"),TEXT("UpperBody"),TEXT("LowerBody"),TEXT("arm_l"),TEXT("arm_r"),TEXT("leg_l"),TEXT("leg_r"),TEXT("Custom")}) Masks.Add(MakeShared<FString>(M));
+        TSharedRef<SWrapBox> PartPicker=SNew(SWrapBox).UseAllottedSize(true);
+        for(const auto& Part:PoseDoll::FSession::PartOptions())
+        {
+            const FString Id=Part.Key,Label=Part.Value;
+            PartPicker->AddSlot().Padding(5,3)[SNew(SBox).WidthOverride(115)
+                [SNew(SCheckBox)
+                    .IsChecked_Lambda([Id]
+                    {
+                        const auto& S=PoseDoll::FSession::Get();
+                        if(S.Adapter)for(const auto& M:S.Adapter->GetMapping())if(M.Semantic==Id && S.IsMasked(M))return ECheckBoxState::Checked;
+                        return ECheckBoxState::Unchecked;
+                    })
+                    .OnCheckStateChanged_Lambda([Id](ECheckBoxState State){PoseDoll::FSession::Get().TogglePart(Id,State==ECheckBoxState::Checked);})
+                    [SNew(STextBlock).Text(FText::FromString(Label))]]];
+        }
         ChildSlot[SNew(SVerticalBox)
         +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Text(FText::FromString(TEXT("PoseDoll Lab · 44 路机械姿势 → Manny Control Rig")))]
+        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(STextBlock).AutoWrapText(true).Text(FText::FromString(TEXT("Control Rig 随时可编辑。点击采集时，仅覆盖选中部位在当前帧的姿势。")))]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
+            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("连接静态人偶"),TEXT("connect"),TEXT("static"))]
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("连接模拟器"),TEXT("connect"))]
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("Live / 恢复"),TEXT("resume"))]
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("Clutch 相对编辑"),TEXT("resume"),TEXT("clutch"))]
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("冻结"),TEXT("freeze"))]
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("断开"),TEXT("disconnect"))]]
-        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("连接静态源"),TEXT("connect"),TEXT("static"))]
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("采集当前姿势"),TEXT("snapshot"))]
-            +SHorizontalBox::Slot().AutoWidth().Padding(6,0)[SNew(SButton).Text(FText::FromString(TEXT("采集并写入当前帧"))).OnClicked_Lambda([this]{PoseDoll::FSession::Get().RequestSnapshot(true,0,Linear);return FReply::Handled();})]
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("静态 Clutch"),TEXT("snapshot_clutch"))]
-            +SHorizontalBox::Slot().AutoWidth().Padding(6,0)[Button(TEXT("取消采集"),TEXT("snapshot_cancel"))]]
+            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("断开"),TEXT("disconnect"))]
+            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("取消采集"),TEXT("snapshot_cancel"))]]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(STextBlock).AutoWrapText(true).Text_Lambda([]{return FText::FromString(PoseDoll::FSession::Get().SnapshotLabel());})]
         +SVerticalBox::Slot().FillHeight(1).Padding(4)[SNew(SPoseViewport)]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("绑定所选角色 / 当前序列"),TEXT("bind_selection"))]
             +SHorizontalBox::Slot().AutoWidth().Padding(8,0)[SNew(SComboBox<TSharedPtr<FString>>).OptionsSource(&Masks)
-                .OnGenerateWidget_Lambda([](TSharedPtr<FString> M){return SNew(STextBlock).Text(FText::FromString(*M));})
+                .OnGenerateWidget_Lambda([](TSharedPtr<FString> M){return SNew(STextBlock).Text(FText::FromString(PoseDoll::FSession::MaskLabel(*M)));})
                 .OnSelectionChanged_Lambda([](TSharedPtr<FString> M,ESelectInfo::Type){if(M)UPoseDollEditorLibrary::SessionCommand(TEXT("mask"),*M);})
-                [SNew(STextBlock).Text_Lambda([]{return FText::FromString(PoseDoll::FSession::Get().Mask);})]]
-            +SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Text(FText::FromString(TEXT("Capture"))).OnClicked_Lambda([this]{Capture(0);return FReply::Handled();})]
-            +SHorizontalBox::Slot().AutoWidth().Padding(6,0)[SNew(SButton).Text(FText::FromString(TEXT("Capture + 前进"))).OnClicked_Lambda([this]{Capture(Step);return FReply::Handled();})]
+                [SNew(STextBlock).Text_Lambda([]{return FText::FromString(PoseDoll::FSession::MaskLabel(PoseDoll::FSession::Get().Mask));})]]
+            +SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Text_Lambda([]{return FText::FromString(TEXT("采集")+PoseDoll::FSession::Get().SelectionLabel());}).OnClicked_Lambda([this]{Capture(0);return FReply::Handled();})]
+            +SHorizontalBox::Slot().AutoWidth().Padding(6,0)[SNew(SButton).Text(FText::FromString(TEXT("采集并前进"))).OnClicked_Lambda([this]{Capture(Step);return FReply::Handled();})]
             +SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(55)[SNew(SNumericEntryBox<int32>).MinValue(1).MaxValue(100).Value_Lambda([this]{return Step;}).OnValueChanged_Lambda([this](int32 V){Step=V;})]]]
+        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SExpandableArea).InitiallyCollapsed(true)
+            .HeaderContent()[SNew(STextBlock).Text(FText::FromString(TEXT("自定义采集部位（仅替换关节转角）")))]
+            .BodyContent()[SNew(SVerticalBox)
+                +SVerticalBox::Slot().AutoHeight()[SNew(SHorizontalBox)
+                    +SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Text(FText::FromString(TEXT("清空选择"))).OnClicked_Lambda([]{PoseDoll::FSession::Get().SetCustomParts({});return FReply::Handled();})]
+                    +SHorizontalBox::Slot().AutoWidth().Padding(6,0)[SNew(SButton).Text(FText::FromString(TEXT("全选"))).OnClicked_Lambda([]{TSet<FString> Parts;for(const auto& P:PoseDoll::FSession::PartOptions())Parts.Add(P.Key);PoseDoll::FSession::Get().SetCustomParts(Parts);return FReply::Handled();})]]
+                +SVerticalBox::Slot().AutoHeight()[PartPicker]]]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("离线中立测试"),TEXT("fixture"),TEXT("neutral.sample.json"))]
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("非对称全身测试"),TEXT("fixture"),TEXT("asymmetric_pose.sample.json"))]
             +SHorizontalBox::Slot().AutoWidth().Padding(8,0)[SNew(SButton).Text_Lambda([this]{return FText::FromString(Linear?TEXT("插值：Linear"):TEXT("插值：Constant"));}).OnClicked_Lambda([this]{Linear=!Linear;return FReply::Handled();})]]
-        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
-            +SHorizontalBox::Slot().AutoWidth()[ContactButton(TEXT("左脚"),TEXT("leg_l"))]
-            +SHorizontalBox::Slot().AutoWidth()[ContactButton(TEXT("右脚"),TEXT("leg_r"))]
-            +SHorizontalBox::Slot().AutoWidth()[ContactButton(TEXT("左手"),TEXT("arm_l"))]
-            +SHorizontalBox::Slot().AutoWidth()[ContactButton(TEXT("右手"),TEXT("arm_r"))]]
-        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
-            +SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("场景放置  ")))]
-            +SHorizontalBox::Slot().AutoWidth()[PlacementInput(TEXT("X cm"),0)]
-            +SHorizontalBox::Slot().AutoWidth()[PlacementInput(TEXT("Y cm"),1)]
-            +SHorizontalBox::Slot().AutoWidth()[PlacementInput(TEXT("Z cm"),2)]
-            +SHorizontalBox::Slot().AutoWidth()[PlacementInput(TEXT("侧倾°"),3)]
-            +SHorizontalBox::Slot().AutoWidth()[PlacementInput(TEXT("俯仰°"),4)]
-            +SHorizontalBox::Slot().AutoWidth()[PlacementInput(TEXT("转向°"),5)]]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).AutoWrapText(true).Text_Lambda([]{const auto& S=PoseDoll::FSession::Get();return FText::FromString(S.State+TEXT("  |  ")+S.Error+TEXT("\n")+(S.Sequence.IsValid()?S.Sequence->GetPathName():TEXT("尚未绑定序列"))+FString::Printf(TEXT("  · 应用 %llu 帧 · Capture %llu 次 · 接触残差 %.3f cm %s"),S.Applied,S.Captures,S.Pose.ContactPositionErrorCm,S.Pose.bContactsReachable?TEXT(""):TEXT("不可达")));})]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).AutoWrapText(true).Text_Lambda([]{const auto& S=PoseDoll::FSession::Get();return FText::FromString(S.State+TEXT("  |  ")+S.Error+TEXT("\n")+S.EditingNote+TEXT("\n")+(S.Sequence.IsValid()?S.Sequence->GetPathName():TEXT("尚未绑定序列"))+FString::Printf(TEXT("  · 已采集 %llu 次"),S.Captures));})]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SExpandableArea).InitiallyCollapsed(true)
             .HeaderContent()[SNew(STextBlock).Text(FText::FromString(TEXT("44 路接收与校准诊断")))]
             .BodyContent()[SNew(SBox).HeightOverride(230)[SNew(SScrollBox)+SScrollBox::Slot()[SNew(STextBlock).Text_Lambda([this]{return Diagnostic;})]]]]
@@ -148,26 +153,10 @@ private:
     bool bPreviousBackgroundThrottle=true;
     FText Diagnostic;
     double LastDiagnostic=0;
-    TSharedRef<SWidget> PlacementInput(const FString& Label,int32 Index)
-    {
-        return SNew(SVerticalBox)+SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(Label))]
-            +SVerticalBox::Slot().AutoHeight()[SNew(SBox).WidthOverride(85)[SNew(SNumericEntryBox<double>).Value_Lambda([Index]{const auto& T=PoseDoll::FSession::Get().Placement;return Index<3?T.GetLocation()[Index]:T.Rotator().Euler()[Index-3];})
-            .OnValueChanged_Lambda([Index](double V){auto& S=PoseDoll::FSession::Get();if(!S.Contacts.IsEmpty()){S.Error=TEXT("先解除接触锁定，再调整场景放置");return;}if(Index<3){auto P=S.Placement.GetLocation();P[Index]=V;S.Placement.SetLocation(P);}else{auto R=S.Placement.Rotator().Euler();R[Index-3]=V;S.Placement.SetRotation(FQuat::MakeFromEuler(R));}})]];
-    }
-    TSharedRef<SWidget> ContactButton(const FString& Label,const FString& Chain)
-    {
-        return SNew(SVerticalBox)
-            +SVerticalBox::Slot().AutoHeight()[SNew(SButton).Text_Lambda([Label,Chain]{return FText::FromString(Label+(PoseDoll::FSession::Get().Contacts.Contains(Chain)?TEXT("：已锁定"):TEXT("：自由")));}).OnClicked_Lambda([Chain]{auto& S=PoseDoll::FSession::Get();S.Contact(Chain,!S.Contacts.Contains(Chain));return FReply::Handled();})]
-            +SVerticalBox::Slot().AutoHeight()[SNew(SButton)
-                .IsEnabled_Lambda([Chain]{return PoseDoll::FSession::Get().Contacts.Contains(Chain);})
-                .Text_Lambda([Chain]{const auto* Goal=PoseDoll::FSession::Get().Contacts.Find(Chain);return FText::FromString(Goal && !Goal->bLockRotation?TEXT("方向：自由"):TEXT("方向：锁定"));})
-                .ToolTipText(FText::FromString(TEXT("保留接触位置，切换是否同时锁定手掌或脚掌方向")))
-                .OnClicked_Lambda([Chain]{if(auto* Goal=PoseDoll::FSession::Get().Contacts.Find(Chain)) Goal->bLockRotation=!Goal->bLockRotation;return FReply::Handled();})];
-    }
     TSharedRef<SWidget> Button(const FString& Label,const FString& Action,const FString& Argument=TEXT(""))
     {return SNew(SButton).Text(FText::FromString(Label)).OnClicked_Lambda([Action,Argument]{UPoseDollEditorLibrary::SessionCommand(Action,Argument);return FReply::Handled();});}
     void Capture(int32 Advance)
-    {auto& S=PoseDoll::FSession::Get();const int32 Frame=ULevelSequenceEditorBlueprintLibrary::GetGlobalPosition().Frame.FrameNumber.Value;S.Capture(Frame,Advance,Linear);}
+    {PoseDoll::FSession::Get().CaptureCurrent(Advance,Linear);}
     TArray<TSharedPtr<FString>> Masks;int32 Step=4;bool Linear=false;
 };
 }

@@ -23,7 +23,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="PoseDoll")
     static FString SolveMeasuredPose22(const FString& PayloadFile, const FString& TargetProfileFile, bool AllowSyntheticForTesting = false);
     UFUNCTION(BlueprintCallable, Category="PoseDoll")
-    static FString CaptureMeasuredPose22(ULevelSequence* Sequence, UControlRig* ControlRig, int32 Frame, const FString& PayloadFile, const FString& TargetProfileFile, bool AllowSyntheticForTesting = false);
+    static FString CaptureMeasuredPose22(ULevelSequence* Sequence, UControlRig* ControlRig, int32 Frame, const FString& PayloadFile, const FString& TargetProfileFile, bool AllowSyntheticForTesting = false, const FString& CaptureMask = TEXT("FullBody"), const FString& CustomParts = TEXT(""));
     UFUNCTION(BlueprintCallable, Category="PoseDoll")
     static bool BindTarget(ULevelSequence* Sequence, USkeletalMeshComponent* Component);
 };

@@ -33,6 +33,7 @@ bool FSession::StaticContextMatches() const
 }
 bool FSession::RequestSnapshot(bool WriteKeys,int32 Advance,bool Linear,bool Clutch)
 {
+    if(Clutch){Error=TEXT("Capture replaces selected joints; relative capture is disabled");return false;}
     if(!Initialize()||!Input){Error=TEXT("Connect a PDS1 static source first");return false;}
     const auto S=Input->Snapshot();
     if(!S.bConnected||!S.bStatic){Error=TEXT("This source does not support static requests");return false;}

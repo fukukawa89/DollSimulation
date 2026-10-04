@@ -101,51 +101,91 @@ FString UPoseDollEditorLibrary::SolveMeasuredPose22(const FString& PayloadFile,c
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 
-FString UPoseDollEditorLibrary::CaptureMeasuredPose22(ULevelSequence* Sequence,UControlRig* ControlRig,int32 Frame,const FString& PayloadFile,const FString& TargetProfileFile,bool AllowSyntheticForTesting)
+#include "PoseDollPoseEditing.h"
+#include "PoseDollKeying.h"
+#include "PoseDollSession.h"
+#include "MovieSceneSequencePlayer.h"
+#include "Editor.h"
+
+FString UPoseDollEditorLibrary::CaptureMeasuredPose22(ULevelSequence* Sequence,UControlRig* ControlRig,int32 Frame,const FString& PayloadFile,const FString& TargetProfileFile,bool AllowSyntheticForTesting,const FString& CaptureMask,const FString& CustomParts)
 {
     const FString Solved=SolveMeasuredPose22(PayloadFile,TargetProfileFile,AllowSyntheticForTesting);
     TSharedPtr<FJsonObject> Data;
     if(!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Solved),Data)||!Data->GetBoolField(TEXT("ok")))return Solved;
     auto Fail=[&](const FString& Message){auto Out=MakeShared<FJsonObject>();Out->SetBoolField(TEXT("ok"),false);Out->SetStringField(TEXT("error"),Message);return PoseDoll::JsonString(Out);};
     if(!Sequence||!ControlRig)return Fail(TEXT("Explicit sequence and Control Rig required"));
+    if(GEditor->IsTransactionActive())return Fail(TEXT("Finish the current edit before capturing a pose"));
     auto* Movie=Sequence->GetMovieScene();
     if(!Movie||Movie->IsReadOnly()||ControlRig->IsAdditive())return Fail(TEXT("Read-only or additive Rig capture is unsupported"));
+    if(Sequence!=ULevelSequenceEditorBlueprintLibrary::GetCurrentLevelSequence() || Sequence!=ULevelSequenceEditorBlueprintLibrary::GetFocusedLevelSequence() || ULevelSequenceEditorBlueprintLibrary::IsPlaying())
+        return Fail(TEXT("Open and pause the target top-level sequence before capturing"));
     UMovieSceneControlRigParameterSection* Section=nullptr;int32 Matches=0;
     for(const auto& Binding:static_cast<const UMovieScene*>(Movie)->GetBindings())for(auto* Base:Binding.GetTracks())
     {
         auto* Track=Cast<UMovieSceneControlRigParameterTrack>(Base);
         if(!Track||Track->GetControlRig()!=ControlRig)continue;
         if(Track->GetAllSections().Num()!=1)return Fail(TEXT("Select a single-section Control Rig track"));
+        for(auto* Other:Binding.GetTracks())if(Other!=Track && (Other->IsA<UMovieSceneControlRigParameterTrack>() || Other->GetClass()->GetName().Contains(TEXT("SkeletalAnimation"))))
+            return Fail(TEXT("The binding has competing animation tracks"));
         Section=Cast<UMovieSceneControlRigParameterSection>(Track->GetAllSections()[0]);++Matches;
     }
     if(Matches!=1||!Section)return Fail(TEXT("Control Rig must belong uniquely to the selected sequence"));
-    if(Section->IsReadOnly()||!Section->IsActive())return Fail(TEXT("Section must be active and writable"));
-    const auto* Warp=Section->GetTimeWarp();
-    if(Warp&&!(*Warp==FMovieSceneTimeWarpVariant(1.0)))return Fail(TEXT("Time warp is unsupported"));
     auto* Component=ControlRig->GetObjectBinding().IsValid()?Cast<USkeletalMeshComponent>(ControlRig->GetObjectBinding()->GetBoundObject()):nullptr;
     if(!Component && ControlRig->GetObjectBinding().IsValid())if(auto* Actor=Cast<AActor>(ControlRig->GetObjectBinding()->GetBoundObject()))Component=Actor->FindComponentByClass<USkeletalMeshComponent>();
     if(!Component||Component->GetSkeletalMeshAsset()!=LoadObject<USkeletalMesh>(nullptr,*Data->GetStringField(TEXT("mesh"))))return Fail(TEXT("Bound mesh differs from the validated target"));
-    const auto Controls=Data->GetObjectField(TEXT("controls")),Switches=Data->GetObjectField(TEXT("switches"));
-    for(const auto& V:Controls->Values)if(!Section->HasTransformParameter(FName(*V.Key)))return Fail(FString(TEXT("Missing control channel "))+V.Key);
-    for(const auto& V:Switches->Values)if(!Section->HasBoolParameter(FName(*V.Key)))return Fail(FString(TEXT("Missing switch channel "))+V.Key);
+    FString Error;PoseDoll::FCuratedAdapter Adapter;
+    if(!Adapter.Initialize(ControlRig->GetClass(),Component->GetSkeletalMeshAsset(),TargetProfileFile,Error))return Fail(Error);
+    const TSet<FString> Masks={TEXT("FullBody"),TEXT("UpperBody"),TEXT("LowerBody"),TEXT("arm_l"),TEXT("arm_r"),TEXT("leg_l"),TEXT("leg_r"),TEXT("Custom")};
+    if(!Masks.Contains(CaptureMask))return Fail(TEXT("Unknown capture mask"));
+    TArray<FString> Parts;CustomParts.ParseIntoArray(Parts,TEXT(","),true);
+    for(FString& Part:Parts)
+    {
+        Part.TrimStartAndEndInline();
+        if(Part==TEXT("pelvis") || !PoseDoll::FSession::PartOptions().ContainsByPredicate([&](const auto& P){return P.Key==Part;}))
+            return Fail(TEXT("Unmeasured or unknown O22 capture part: ")+Part);
+    }
+    TSet<FName> Selected;
+    for(const auto& M:Adapter.GetMapping())
+    {
+        // O22 has no root sensor; keep UE-authored pelvis placement and rotation.
+        if(M.Semantic==TEXT("pelvis"))continue;
+        if(CaptureMask==TEXT("FullBody") || (CaptureMask==TEXT("UpperBody") && !M.Group.StartsWith(TEXT("leg"))) ||
+           (CaptureMask==TEXT("LowerBody") && M.Group.StartsWith(TEXT("leg"))) || CaptureMask==M.Group ||
+           (CaptureMask==TEXT("Custom") && Parts.Contains(M.Semantic)))Selected.Add(M.Control);
+    }
+    PoseDoll::FPoseResult Source;
+    for(const auto& V:Data->GetObjectField(TEXT("bones"))->Values)
+    {
+        const auto O=V.Value->AsObject();const auto P=O->GetArrayField(TEXT("p")),Q=O->GetArrayField(TEXT("q")),S=O->GetArrayField(TEXT("s"));
+        Source.Bones.Add(FName(*V.Key),FTransform(FQuat(Q[0]->AsNumber(),Q[1]->AsNumber(),Q[2]->AsNumber(),Q[3]->AsNumber()),FVector(P[0]->AsNumber(),P[1]->AsNumber(),P[2]->AsNumber()),FVector(S[0]->AsNumber(),S[1]->AsNumber(),S[2]->AsNumber())));
+    }
+    PoseDoll::FSession::Get().InvalidateSnapshotContext();
+    ULevelSequenceEditorBlueprintLibrary::SetGlobalPosition(FMovieSceneSequencePlaybackParams(FFrameTime(Frame),EUpdatePositionMethod::Jump));
+    ControlRig->Evaluate_AnyThread();
+    PoseDoll::FEditPose Edit;
+    if(!PoseDoll::FNativePoseEditing::Capture(ControlRig,Adapter,Source,Selected,Edit,Error))return Fail(Error);
     const FFrameNumber Time=FFrameRate::TransformTime(FFrameTime(Frame),Movie->GetDisplayRate(),Movie->GetTickResolution()).RoundToFrame();
+    if(!PoseDoll::FNativePoseKeys::Validate(Section,ControlRig,Time,Edit,Error))return Fail(Error);
+    TMap<FName,bool> Previous;for(const auto& V:Edit.Switches)Previous.Add(V.Key,ControlRig->GetControlValue(V.Key).Get<bool>());
+    bool Valid=true;
     {
         FScopedTransaction Transaction(FText::FromString(TEXT("Capture PoseDoll O22 measured pose")));
-        Sequence->Modify();Movie->Modify();Section->Modify();Section->ExpandToFrame(Time);
-        for(const auto& V:Controls->Values)
+        Sequence->Modify();Movie->Modify();Section->Modify();
+        PoseDoll::FNativePoseKeys::Write(Section,ControlRig,Time,Edit,Previous,EMovieSceneKeyInterpolation::Constant);
+        ULevelSequenceEditorBlueprintLibrary::RefreshCurrentLevelSequence();
+        ULevelSequenceEditorBlueprintLibrary::SetGlobalPosition(FMovieSceneSequencePlaybackParams(FFrameTime(Frame),EUpdatePositionMethod::Jump));
+        ControlRig->Evaluate_AnyThread();
+        for(const auto& M:Adapter.GetMapping())
         {
-            const auto O=V.Value->AsObject();const auto P=O->GetArrayField(TEXT("p")),Q=O->GetArrayField(TEXT("q")),S=O->GetArrayField(TEXT("s"));
-            FTransform T(FQuat(Q[0]->AsNumber(),Q[1]->AsNumber(),Q[2]->AsNumber(),Q[3]->AsNumber()),FVector(P[0]->AsNumber(),P[1]->AsNumber(),P[2]->AsNumber()),FVector(S[0]->AsNumber(),S[1]->AsNumber(),S[2]->AsNumber()));
-            const FName Name(*V.Key);Section->AddTransformParameterKey(Name,Time,T,EMovieSceneKeyInterpolation::Constant);
-            if(Section->CanCreateSpaceChannel(Name))
-            {
-                Section->AddSpaceChannel(Name,true);
-                if(auto* Space=Section->GetSpaceChannel(Name))Space->SpaceCurve.GetData().UpdateOrAddKey(Time,FMovieSceneControlRigSpaceBaseKey());
-            }
+            const FTransform Actual=ControlRig->GetHierarchy()->GetGlobalTransform(FRigElementKey(M.Bone,ERigElementType::Bone));
+            const FTransform Expected=Edit.Bones[M.Bone];
+            if(FVector::Distance(Actual.GetLocation(),Expected.GetLocation())>.1 || FMath::RadiansToDegrees(Actual.GetRotation().AngularDistance(Expected.GetRotation()))>.5)
+            {Valid=false;Error=TEXT("Sequence readback failed: ")+M.Bone.ToString();break;}
         }
-        for(const auto& V:Switches->Values)Section->AddBoolParameterKey(FName(*V.Key),Time,V.Value->AsBool());
-        Section->MarkAsChanged();
     }
-    ULevelSequenceEditorBlueprintLibrary::RefreshCurrentLevelSequence();
-    return Solved;
+    if(!Valid){GEditor->UndoTransaction();return Fail(TEXT("Capture rolled back: ")+Error);}
+    Data->SetStringField(TEXT("capture_mask"),CaptureMask);
+    TArray<TSharedPtr<FJsonValue>> Written;for(const auto& V:Edit.Controls)Written.Add(MakeShared<FJsonValueString>(V.Key.ToString()));
+    Data->SetArrayField(TEXT("written_controls"),Written);Data->SetStringField(TEXT("capture_operation"),TEXT("ReplaceLocalRotation"));
+    return PoseDoll::JsonString(Data.ToSharedRef());
 }

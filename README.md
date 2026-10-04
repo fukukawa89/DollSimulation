@@ -34,7 +34,7 @@ UE 5.8.2 的机械人偶姿态映射插件，以及独立的中文 Python 桌面
 - `/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple`
 - `/Game/Characters/Mannequins/Rigs/CR_Mannequin_Body`
 
-Rig 层级、控制器与参考变换须符合 `Shared/Profiles/manny_body_ue582_v1.json`；不匹配时需重新验证映射。创建包含目标 Manny 的关卡及顶层 Level Sequence，打开「窗口 → PoseDoll Lab」，绑定所选角色和当前序列，连接模拟器并进入 Live。
+Rig 层级、控制器与参考变换须符合 `Shared/Profiles/manny_body_ue582_v1.json`；不匹配时需重新验证映射。创建包含目标 Manny 的关卡及顶层 Level Sequence，打开「窗口 → PoseDoll Lab」，绑定所选角色和当前序列，连接模拟器，选择全身、分区或自定义范围后点击采集。已有 Control Rig 可继续手工编辑，采集仅在按钮触发时覆盖所选关节。
 
 仓库中的 `DollSimulation.uproject` 保留原开发工程配置，启用了 MCP 相关开发插件。`PoseDollAutomation` 依赖 `ToolsetRegistry` 和 `PythonScriptPlugin`，仅用于自动化验证；普通使用只需主 `PoseDoll` 插件。原开发机的 UE 构建脚本支持指定引擎目录：
 
@@ -53,4 +53,4 @@ Rig 层级、控制器与参考变换须符合 `Shared/Profiles/manny_body_ue582
 - 原生 UE 测试：`Plugins/PoseDoll/Source/PoseDollCore/Private/PoseDollCoreTests.cpp`
 - UE 集成验证：`Scripts/test_*.py`；部分脚本针对原开发工程及测试资产，迁移后需检查路径和准备条件。
 
-本地已验证姿态映射、Capture、Undo/Redo、保存后重开、Clutch、身体区域遮罩、接触约束和 30 分钟 60 Hz 输入稳定性。仓库不包含生成的日志、截图或报告。
+当前采集流程与验收脚本见完整使用说明。旧的 Live、Clutch、接触及持续流验收记录仅对应历史版本。仓库不包含生成的日志、截图或报告。

@@ -1,65 +1,49 @@
-# PoseDoll Lab 实现说明
+# PoseDoll 编辑与采集实现
 
-基线为相邻目录中未改写的 v0.1 设计与协议。实现针对 UE 5.8.2 / CL 56702186；测试证据见 `reports/ACCEPTANCE.md`。
+针对 UE 5.8.2 / CL 56702186。机械校准、54 节点 FK、传输协议和目标 profile 的基础定义沿用原实现；此版本改变编辑器采集语义。
 
-## 数据流和所有权
+## 数据与所有权
 
-```text
-Qt 机械 q → 校准反函数 → raw 传感器角度 → TCP 60 Hz
-  → PoseDollTransport worker：长度帧、JSON、身份/序号校验、最新样本槽
-  → Editor game thread：周期展开/校准 → 54 节点机械 FK → 20 语义段
-  → Curated Manny Adapter → 临时 Control Rig → 可选接触约束
-  → 临时 PoseableMesh 视口
-  → 显式 Capture：正式 Level Sequence 的受管 Control Rig 轨道
-```
+网络 worker 校验身份、配置、序号和完整性，只保留数据；不持有目标 UObject，也不直接写 Rig。`CaptureCurrent` 是面板的统一入口：PDS1 发起静态请求，模拟器读取 250 ms 内的完整样本，离线 fixture 走同一写入流程。没有按钮操作时不会把源姿势写入动画。
 
-Python 不导入 `unreal`，UE 生产数据路径不启动 Python，也不消费目标骨骼或 controls 网络消息。两侧独立实现机械数学，以原始 golden vectors 交叉验证。
+PDS1 保留请求 ID、截止时间、稳定窗口和迟到回复隔离。`ObserveObjectModified`、播放头/目标/范围检查及上下文版本使等待中的请求失效。提交过程使用保护标记，避免自己的关键帧修改取消自己的请求；用户在等待期间的修改会取消请求。
 
-`PoseDollCore` 只处理配置、矩阵、协议解析和连续解码；`PoseDollTransport` 拥有 socket worker；`PoseDollRig` 拥有临时目标实例与接触求解；`PoseDollEditor` 负责会话、Slate、绑定和事务。可选 `PoseDollAutomation` 单独依赖 Toolset Registry 和引擎 Python，仅提供低频测试入口。主插件不依赖 MCP。
+`PoseDollCore` 负责配置、机械数学和协议；`PoseDollTransport` 负责网络；`PoseDollRig` 保留目标适配和诊断求解；`PoseDollEditor` 负责选择、一次性求解、键入、回读和事务。主插件不依赖 MCP 或外部 Python 进程。测试中的 Python 服务仅模拟传感器。
 
-worker 不持有 UObject，不调用 Rig 或 Sequencer。接收缓存有长度上限，完整样本覆盖最新槽；game thread 每 tick 至多取最新样本。旧会话、重复/倒序序号、缺失轴和错误 hash 均不会被补成零值。Body35 的固定轴来自明确的 capability 文件。
+## 当前姿势与局部覆盖
 
-关闭面板注销预览场景并释放网络源、Rig、目标绑定和约束。断线及新设备 UUID 都取消 Live，重连后必须明确 Resume。Rig VM 编译事件、对象替换、切关卡、删除目标和切换序列会使旧会话失效。
+`PoseDollPoseEditing.cpp` 在同类临时 Rig 上复制目标当前 hierarchy pose。输入的目标骨骼姿态先转换为相对真实父骨骼的旋转，再结合目标当前父骨骼得到所选关节的目标朝向。因此手腕采集不带入源肩膀朝向，也不积累已有目标旋转。
 
-面板生命周期内临时关闭 Editor 后台 CPU 降频，使 Python 模拟器在前台时仍可实时预览；析构时恢复原偏好，不调用 SaveConfig。此设置管理另有 10 次开关的集成验证，覆盖原值为 true 和 false。
+`PoseDollSelection.cpp` 把八个范围映射到 profile 的语义关节。腰部和头颈分别可能对应多个控制器。下半身默认排除骨盆，单臂包含肩带。自定义允许空集，但不能提交空集。
 
-## 数学和目标映射
+仅所选关节所属的 IK 链需要转换。先匹配整条链，再优先匹配未选关节，最后覆盖所选转角。原生 FK Point At 使用相邻控制器的位置定向；脊柱匹配不能在最后一步用所选终点的位置再次破坏未选前驱关节。因此匹配允许所选关节和它的子层级跟随受保护的前驱关节，其他骨骼须通过 0.5° / 0.1 cm 检查。
 
-规范空间采用 RH、X 前/Y 左/Z 上、米/弧度、Hamilton xyzw。每轴保留前后刚性变换，按指定机械树顺序相乘。UE 转换统一使用反射 `H = diag(1,-1,1)`，位置换为 cm；姿态执行 `H R H`。目标 Manny 朝向再按 target profile 的 +90° Z 基变换处理。
+初始转换可能需要同链支持控制器的平移/旋转关键帧，以保存 IK 已经求出的姿势。正常 FK 关节采集在无需匹配平移时仅写旋转。源的机械连杆长度、场景根位移和手指数据不作为人体骨骼长度或放置输入。选中父关节后，子层级按原生 Rig 规则跟随，不承诺世界锁定。
 
-连续解码先确定周期分支，再应用 zero/sign/ratio 与机械限位；未知多圈分支拒绝猜测。失败样本不会提交半套连续角状态。配置 hash 基于原始文件内容，不用重新序列化后的 JSON 替代。
+## 原生 IK/FK 开关
 
-target profile 固定到项目内真实 `SKM_Manny_Simple`、`CR_Mannequin_Body`。23 个 controls 对应骨盆、脊柱、颈头、肩带、双臂、双腿与前脚掌；源 N pose 经目标参考骨骼校准，不直接当作导入 A pose。躯干与颈部分配采用共同参考基中的旋转份额，不在每根骨上重复完整角度。
+`PoseDollRigEditing.cpp` 观察已经绑定或标记的标准 Rig。采集向原生轨道的包元数据写入 `PoseDoll.MatchIKFK=1`，保存重开后仍可恢复观察。它不改写标准 Rig 蓝图或生成类，不影响其他未使用 PoseDoll 的轨道。
 
-层级指纹包含骨骼、controls、null/space、参考变换、类型和父子关系。当前已验证 SHA-256 为：
+只有显式控制器修改事件触发匹配。播放求值只更新已观察的模式，`Never` 通知、Undo/Redo、插件自身写入及不在当前播放头的脚本修改不触发自动写键。观察在编辑器模块 tick 中管理，不依赖面板或源连接的生命周期。
 
-`8178edddcdbf500319aa1ce6b548fa9633bfd0ecf244122ecdeacb65d8d8e9f6`
+回到 IK 时从当前 FK 重建目标：使用原生 Backwards Solve 的相关控制输出，舍弃其无关链输出；弯曲明确的手臂/腿还从当前三关节位置求 pole 方向，接近直线时保留原生解，避免不稳定平面。绝不把历史 IK 目标直接恢复为新目标。
 
-标准 FullBody FK 每帧执行一次原 Rig Forward Solve。转换 controls 前，依据校准骨长预测躯干、肩带和 FK space 的枢轴；手臂和头部空间的方向按原 Rig 的实际规则跟随 body_ctrl，其他空间跟随对应躯干骨骼。14 个 FK/IK、伸缩和 local 开关显式配置并按掩码写 key。最终骨骼仍由原 Rig 求解。未修改原 Rig 图，也没有在其蒙皮结果上强行覆盖骨骼。260 组单轴/组合回读覆盖此优化。
+双骨 IK、脊柱曲线与逐关节 FK 的表达能力不同。模式切换对受影响链计算最大姿势差异并通知用户，不能声称任意 FK→IK 或 IK→FK 完全无损。无关链须保持一致。通常的手腕编辑、可表达的肢体姿势能保持匹配；不满足约束的旋转会出现明确偏差提示，可一次撤销。
 
-原 Rig 自有 twist/corrective bones 继续由原 Rig 管理。基础旋转误差判据只作用于明确映射骨骼；机械连杆尺寸不写入 Manny 骨长。临时骨骼视口和 raw FK/约束后 pose 报告用于诊断。未提供通用 GeneratedFK 或 Backwards Solve 自动适配。
+## 原生关键帧与事务
 
-## 相对编辑、接触和采集
+`PoseDollKeying.cpp` 共用于面板采集、模式切换和 O22 文件采集。写入前检查 section、混合类型、权重、时间扭曲、控制器通道和开关通道。旋转沿相邻已有键选择连续的欧拉分支；模式与控制值各只写相应时间的键。
 
-Clutch 在开始时固定源基准和当前正式控制器基准；后续增量相对于这两个快照计算，不累积上一帧输出。更换时间点会冻结 Clutch。更换掩码重新采集正式控制器基准，避免将另一次预览缓存当成未选部位的基准。
+某通道首次加入关键帧时，它会向前外推。因此在需要时，插件在采集时刻前一个 tick 写入旧值，保持较早时间的已求值姿势。既有其他时间的键不删除、不重写。新键到下一已有键之间按选定插值求值；模式开关同样持续生效到下一模式键，并非只影响单独一帧。
 
-接触使用目标 FK 副本上的解析双骨 IK。root 保持源 FK 的策略；每条链保持原骨长，距离夹到几何可达区间但明确报告超出残差，不能以夹取后的目标冒充成功。pole 使用当前弯曲平面；退化时依次使用上一稳定方向及首选方向。首选方向为目标组件坐标中的手臂 -Y、腿 +Y。位置阈值 0.5 cm，锁方向时角度阈值 1°。无拉伸；不可达时拒绝 Capture。
+采集使用一个 `FScopedTransaction`，然后强制 Sequencer 求值，回读实际控制值及映射骨骼；失败回滚当前采集。原生开关匹配加入用户当前事务，没有活动事务时建立一项。Undo/Redo 后重新寻找目标轨道，必要时更换同类 runtime Rig，保留 section 及所有关键帧。
 
-接触目标存于目标组件坐标，场景放置不随 Live 改写。锁定期间禁止编辑 Placement，避免坐标语义变化；移动场景放置前先解锁。位置和方向可独立开关。最终求解转为 FK controls，因此保存后的播放无需继续运行求解器。
+绑定可复用已命名、已编辑的标准 Rig 轨道；新轨道才使用 `PoseDoll / Manny` 名称。竞争动画、多 Rig 混合、多个 section、嵌套 focused sequence、非均匀/负缩放及只读状态明确拒绝。O22 同样使用局部覆盖和事务；其根姿态未测量，骨盆始终保留 UE 编辑值。
 
-Capture 验证确切 sequence/binding/component/track，按显示帧率转换到 tick resolution，冻结输入并开启一个 `FScopedTransaction`。写入受管 controls、必要的 FK/IK/伸缩开关、space 状态和可选 Placement，然后使用正式 Rig 求值回读。失败回滚事务；成功保留 Frozen。欧拉旋转依据相邻已有 key 选择连续分支。
+## 持久化与验证
 
-`PoseDoll / Manny` 只管理自己创建的轨道；歧义 Control Rig、竞争动画、嵌套 focused sequence、时间扭曲和非均匀/负缩放均拒绝。UpperBody 不新增腿、手指或面部 key。Placement 使用单独的受管变换轨道，不混入 44 路数据。
+原生 Control Rig 关键帧保存在序列 `.uasset`；来源 JSON 不参与播放，断开人偶后可编辑和保存。自动模式匹配是编辑器插件能力，播放不需要重新运行采集。
 
-`Saved/PoseDoll` 的采集 JSON 记录来源、raw/q、映射指纹、controls、约束、掩码、基准、误差和帧率。可播放结果是 `.uasset` 中的原生关键帧，JSON 不参与序列求值。
+新验收脚本及运行方式见 [README_PoseDoll.md](README_PoseDoll.md)。报告区分引擎集成、模拟 TCP 和合成 O22 数据，不将它们视作实体硬件验证。历史 Live / Clutch / 接触与持续流测试只适用于之前的行为。
 
-## 本机 API 差异与边界
-
-- UE 5.8 本机 `UControlRigBlueprint` 头文件为 `ControlRigBlueprintLegacy.h`；Python 对应类型仍可加载项目现有资产。
-- Control Rig Sequencer 的 C++ 类为 `UControlRigSequencerEditorLibrary`，Python 类为 `unreal.ControlRigSequencerLibrary`。
-- Windows 本机构建未实现通用平台 SHA-256 入口，目标指纹使用引擎随附 OpenSSL。
-- `OnObjectModified` 不足以覆盖 VM-only compile，额外直接订阅 `OnVMCompiled()`。
-- 测试 Sequencer 需要完整 Editor/Slate 初始化；使用 `-ExecutePythonScript`，不能用普通 `-run=pythonscript` commandlet 替代。
-- 现版本仍使用 UE 5.8 可用但已标记 deprecated 的 `FindBindingFromObject` 重载；升级引擎时须迁移和重新验收，不能宣称跨版本兼容。
-- 长时间性能是本机 Development Editor 的 CPU 应用时延；不宣称测得源到显示器光子的端到端时延。
-- 实体装配、打印、传感器精度、真实碰撞和任意第三方 Rig 均未验收。
+仍使用 UE 5.8 可用的 deprecated `FindBindingFromObject` 重载；升级引擎时需迁移及重新验证。第三方 Rig、物理制造、真实传感器精度、跨 UE 版本兼容未包含在这次验收内。

@@ -18,6 +18,15 @@ public:
     bool Connect(uint16 Port=39177);
     void Disconnect();
     bool Resume(bool Clutch=false);
+    bool CaptureCurrent(int32 Advance=0,bool Linear=false);
+    bool SetCustomParts(const TSet<FString>& Parts);
+    void TogglePart(const FString& Part,bool Enabled);
+    static const TArray<TPair<FString,FString>>& PartOptions();
+    static FString MaskLabel(const FString& Value);
+    FString SelectionLabel() const;
+    TSet<FString> CustomParts;
+    void TickRigEditing();
+    void ClearRigObservers();
     void Freeze();
     void SetMask(const FString& InMask);
     bool LoadFixture(const FString& Filename);
@@ -36,7 +45,7 @@ public:
     FString DiagnosticText() const;
     FString PoseReport() const;
     FString KeyReport() const;
-    FString State=TEXT("Disconnected"),Error,Mask=TEXT("FullBody");
+    FString State=TEXT("Disconnected"),Error,EditingNote,Mask=TEXT("FullBody");
     FProfile Profile;
     TUniquePtr<FCuratedAdapter> Adapter;
     FPoseResult Pose,RawPose;
@@ -60,6 +69,15 @@ private:
     bool Apply(const FSample& Sample,const FIdentity& Identity);
     bool StaticContextMatches() const;
     bool TickStatic(const FTransportSnapshot& Transport,double Now);
+    struct FRigObserver
+    {
+        FDelegateHandle Modified,Evaluated;
+        TMap<FName,bool> Modes;
+    };
+    TMap<TWeakObjectPtr<UControlRig>,FRigObserver> RigObservers;
+    bool bEditingRig=false;
+    void RememberRigModes(UControlRig* Rig);
+    void OnRigModified(UControlRig* Rig,FRigControlElement* Control,const FRigControlModifiedContext& Context);
     bool bRigNeedsRebuild=false;
     bool bApplyingStatic=false,bSnapshotEligible=false,bStaticCommit=false,bSnapshotWrite=false,bSnapshotLinear=false;
     int32 SnapshotFrame=0,SnapshotAdvance=0;float SnapshotSubFrame=0;

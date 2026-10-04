@@ -20,8 +20,20 @@ FString UPoseDollEditorLibrary::SessionCommand(const FString& Action,const FStri
     else if (Action==TEXT("bind_selection")) Ok=S.BindSelection();
     else if (Action==TEXT("mask"))
     {
-        const TArray<FString> Masks={TEXT("FullBody"),TEXT("UpperBody"),TEXT("arm_l"),TEXT("arm_r"),TEXT("leg_l"),TEXT("leg_r")};
+        const TArray<FString> Masks={TEXT("FullBody"),TEXT("UpperBody"),TEXT("LowerBody"),TEXT("Custom"),TEXT("arm_l"),TEXT("arm_r"),TEXT("leg_l"),TEXT("leg_r")};
         Ok=Masks.Contains(Argument);if (Ok) S.SetMask(Argument);else S.Error=TEXT("Unknown mask");
+    }
+    else if(Action==TEXT("custom_parts"))
+    {
+        TSharedPtr<FJsonObject> O;FString E;const TArray<TSharedPtr<FJsonValue>>* Parts=nullptr;
+        if(!PoseDoll::ReadJson(Argument,O,E)||!O->TryGetArrayField(TEXT("parts"),Parts)){Ok=false;S.Error=TEXT("Expected a parts array");}
+        else{TSet<FString> Values;for(const auto& P:*Parts)Values.Add(P->AsString());Ok=S.SetCustomParts(Values);}
+    }
+    else if(Action==TEXT("capture_current"))
+    {
+        int32 Advance=0;bool Linear=false;TSharedPtr<FJsonObject> O;FString E;
+        if(!Argument.IsEmpty()&&!PoseDoll::ReadJson(Argument,O,E)){Ok=false;S.Error=E;}
+        else{if(O){O->TryGetNumberField(TEXT("advance"),Advance);O->TryGetBoolField(TEXT("linear"),Linear);}Ok=S.CaptureCurrent(Advance,Linear);}
     }
     else if(Action==TEXT("snapshot")||Action==TEXT("snapshot_capture")||Action==TEXT("snapshot_clutch"))
     {
