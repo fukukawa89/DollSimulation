@@ -23,7 +23,7 @@ void FSession::ObserveObjectModified(UObject* Object)
 }
 bool FSession::StaticContextMatches() const
 {
-    if(ContextRevision!=SnapshotRevision||Sequence!=SnapshotSequence||Component!=SnapshotComponent||Binding!=SnapshotBinding||Mask!=SnapshotMask||Profile.Hash!=SnapshotProfile||Profile.CalibrationHash!=SnapshotCalibration||!Placement.Equals(SnapshotPlacement))return false;
+    if(ContextRevision!=SnapshotRevision||Sequence!=SnapshotSequence||Component!=SnapshotComponent||Binding!=SnapshotBinding||Mask!=SnapshotMask||Profile.Hash!=SnapshotProfile||Profile.CalibrationHash!=SnapshotCalibration)return false;
     if(Sequence.IsValid())
     {
         const auto Position=ULevelSequenceEditorBlueprintLibrary::GetGlobalPosition().Frame;
@@ -31,9 +31,8 @@ bool FSession::StaticContextMatches() const
     }
     return true;
 }
-bool FSession::RequestSnapshot(bool WriteKeys,int32 Advance,bool Linear,bool Clutch)
+bool FSession::RequestSnapshot(bool WriteKeys,int32 Advance,bool Linear)
 {
-    if(Clutch){Error=TEXT("Capture replaces selected joints; relative capture is disabled");return false;}
     if(!Initialize()||!Input){Error=TEXT("Connect a PDS1 static source first");return false;}
     const auto S=Input->Snapshot();
     if(!S.bConnected||!S.bStatic){Error=TEXT("This source does not support static requests");return false;}
@@ -41,10 +40,8 @@ bool FSession::RequestSnapshot(bool WriteKeys,int32 Advance,bool Linear,bool Clu
     if(StaticWindow.Pending())return true; // A second click is idempotent, not another key.
     if(WriteKeys&&!ValidateTarget(true))return false;
     if(Sequence.IsValid()&&!ValidateTarget(true))return false;
-    if(Clutch&&!bHasSnapshot){Error=TEXT("Capture a source snapshot before starting static Clutch");return false;}
-    CancelSnapshot(TEXT("New capture request"));bLive=false;bFixture=false;bSnapshotEligible=false;
-    bClutch=Clutch;SnapshotBaseline();
-    SnapshotSequence=Sequence;SnapshotComponent=Component;SnapshotBinding=Binding;SnapshotMask=Mask;SnapshotProfile=Profile.Hash;SnapshotCalibration=Profile.CalibrationHash;SnapshotPlacement=Placement;SnapshotRevision=ContextRevision;
+    CancelSnapshot(TEXT("New capture request"));bFixture=false;bSnapshotEligible=false;
+    SnapshotSequence=Sequence;SnapshotComponent=Component;SnapshotBinding=Binding;SnapshotMask=Mask;SnapshotProfile=Profile.Hash;SnapshotCalibration=Profile.CalibrationHash;SnapshotRevision=ContextRevision;
     const auto Position=ULevelSequenceEditorBlueprintLibrary::GetGlobalPosition().Frame;
     SnapshotFrame=Position.FrameNumber.Value;SnapshotSubFrame=Position.GetSubFrame();SnapshotAdvance=Advance;bSnapshotLinear=Linear;bSnapshotWrite=WriteKeys;
     Generation=S.Generation;SnapshotSourceKind=S.StaticIdentity.SourceKind;

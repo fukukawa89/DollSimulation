@@ -9,7 +9,7 @@ class UPoseDollToolset : public UToolsetDefinition
 {
     GENERATED_BODY()
 public:
-    /** Return connection, pose, binding, contact residuals and measured performance. */
+    /** Return connection, one-shot capture, binding and measured performance. */
     UFUNCTION(meta=(AICallable),Category="PoseDoll")
     static FString GetPoseDollStatus();
     /** Load a bundled raw sensor fixture into the transient preview. Does not create keys. */
@@ -21,7 +21,4 @@ public:
     /** Execute a low frequency, explicit session operation; the native service validates the action and target. */
     UFUNCTION(meta=(AICallable),Category="PoseDoll")
     static FString PoseDollSession(const FString& Action,const FString& Argument=TEXT(""));
-    /** Run one bundled acceptance suite: soak, lifecycle, capture_reopen, contacts or regression. No arbitrary scripts or paths. */
-    UFUNCTION(meta=(AICallable),Category="PoseDoll")
-    static bool RunPoseDollAcceptance(const FString& Suite);
 };

@@ -18,8 +18,8 @@ begin=time.monotonic()
 def connected(delta):
     r=json.loads(unreal.PoseDollEditorLibrary.session_command('status'))
     if r['state']=='Ready':
-        result=json.loads(unreal.PoseDollEditorLibrary.session_command('resume'))
-        if result.get('ok'):unreal.unregister_slate_post_tick_callback(callback);unreal.log('POSEDOLL_INTERACTIVE_DEMO_READY')
+        unreal.unregister_slate_post_tick_callback(callback)
+        unreal.log('POSEDOLL_INTERACTIVE_DEMO_READY: click Capture to transfer one pose')
     elif time.monotonic()-begin>15:
         unreal.unregister_slate_post_tick_callback(callback);unreal.log('POSEDOLL_DEMO_WAITING_FOR_SIMULATOR')
 callback=unreal.register_slate_post_tick_callback(connected)

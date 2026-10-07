@@ -8,5 +8,5 @@
   "EnabledByDefault": true,
   "CanContainContent": false,
   "Modules": [{"Name":"PoseDollAutomation","Type":"Editor","LoadingPhase":"PostEngineInit"}],
-  "Plugins": [{"Name":"PoseDoll","Enabled":true},{"Name":"ToolsetRegistry","Enabled":true},{"Name":"PythonScriptPlugin","Enabled":true}]
+  "Plugins": [{"Name":"PoseDoll","Enabled":true},{"Name":"ToolsetRegistry","Enabled":true}]
 }

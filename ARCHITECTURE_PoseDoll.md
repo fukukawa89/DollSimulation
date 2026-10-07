@@ -4,7 +4,7 @@
 
 ## 数据与所有权
 
-网络 worker 校验身份、配置、序号和完整性，只保留数据；不持有目标 UObject，也不直接写 Rig。`CaptureCurrent` 是面板的统一入口：PDS1 发起静态请求，模拟器读取 250 ms 内的完整样本，离线 fixture 走同一写入流程。没有按钮操作时不会把源姿势写入动画。
+网络 worker 校验身份、配置、序号和完整性，只保留数据；不持有目标 UObject，也不直接写 Rig。`CaptureCurrent` 是面板的统一入口：PDS1 发起静态请求，模拟器读取 250 ms 内的完整样本，离线 fixture 走同一写入流程。没有按钮操作时不会把源姿势写入动画。会话中不再存在 Live / Clutch 状态、逐帧 `Apply`、相对采集基准、接触约束或 Placement 写帧路径。局部覆盖统一由 `FNativePoseEditing::Capture` 基于当前目标姿势完成。
 
 PDS1 保留请求 ID、截止时间、稳定窗口和迟到回复隔离。`ObserveObjectModified`、播放头/目标/范围检查及上下文版本使等待中的请求失效。提交过程使用保护标记，避免自己的关键帧修改取消自己的请求；用户在等待期间的修改会取消请求。
 
@@ -40,10 +40,16 @@ PDS1 保留请求 ID、截止时间、稳定窗口和迟到回复隔离。`Obser
 
 绑定可复用已命名、已编辑的标准 Rig 轨道；新轨道才使用 `PoseDoll / Manny` 名称。竞争动画、多 Rig 混合、多个 section、嵌套 focused sequence、非均匀/负缩放及只读状态明确拒绝。O22 同样使用局部覆盖和事务；其根姿态未测量，骨盆始终保留 UE 编辑值。
 
+## 预览窗口
+
+`FPoseViewportClient` 关闭本视口的 Eye Adaptation，并固定 EV100 为 0。固定灰底不会再参与自动曝光的跨帧反馈。全局渲染变量、关卡后处理和用户后台节流设置均保持原值。
+
+`PreviewRevision` 在有效源姿势或最终采集结果更新时递增；视口据此更新骨骼。重绘不会拉取或应用网络样本，局部采集完成后的预览也能及时显示最终结果。
+
 ## 持久化与验证
 
 原生 Control Rig 关键帧保存在序列 `.uasset`；来源 JSON 不参与播放，断开人偶后可编辑和保存。自动模式匹配是编辑器插件能力，播放不需要重新运行采集。
 
-新验收脚本及运行方式见 [README_PoseDoll.md](README_PoseDoll.md)。报告区分引擎集成、模拟 TCP 和合成 O22 数据，不将它们视作实体硬件验证。历史 Live / Clutch / 接触与持续流测试只适用于之前的行为。
+新验收脚本及运行方式见 [README_PoseDoll.md](README_PoseDoll.md)。报告区分引擎集成、模拟 TCP 和合成 O22 数据，不将它们视作实体硬件验证。历史 Live / Clutch / 接触与持续流脚本仅保留为历史参考，已移除 MCP 中运行这些脚本的旧验收入口；当前验收使用 `Scripts/TestPoseDollEditing.ps1` 的独立编辑器进程。
 
 仍使用 UE 5.8 可用的 deprecated `FindBindingFromObject` 重载；升级引擎时需迁移及重新验证。第三方 Rig、物理制造、真实传感器精度、跨 UE 版本兼容未包含在这次验收内。

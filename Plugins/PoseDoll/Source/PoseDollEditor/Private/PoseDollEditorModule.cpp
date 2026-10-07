@@ -23,7 +23,6 @@
 #include "MovieSceneSequencePlayer.h"
 #include "UObject/UObjectGlobals.h"
 #include "Engine/SkeletalMesh.h"
-#include "Editor/EditorPerformanceSettings.h"
 
 namespace
 {
@@ -31,7 +30,18 @@ class FPoseViewportClient : public FEditorViewportClient
 {
 public:
     FPoseViewportClient(FPreviewScene* Scene,const TSharedRef<SEditorViewport>& Widget):FEditorViewportClient(nullptr,Scene,Widget)
-    {SetViewLocation(FVector(280,420,200));SetViewRotation((FVector(-50,0,95)-GetViewLocation()).Rotation());SetViewMode(VMI_Lit);SetRealtime(true);EngineShowFlags.SetSelectionOutline(false);}
+    {
+        SetViewLocation(FVector(280,420,200));
+        SetViewRotation((FVector(-50,0,95)-GetViewLocation()).Rotation());
+        SetViewMode(VMI_Lit);
+        SetRealtime(true);
+        EngineShowFlags.SetSelectionOutline(false);
+        // Keep the fixed preview background out of temporal auto-exposure feedback.
+        // This is local to PoseDoll; scene and project exposure settings stay intact.
+        EngineShowFlags.SetEyeAdaptation(false);
+        ExposureSettings.bFixed=true;
+        ExposureSettings.FixedEV100=0;
+    }
     virtual void Draw(const FSceneView* View,FPrimitiveDrawInterface* PDI) override
     {
         FEditorViewportClient::Draw(View,PDI);const auto& S=PoseDoll::FSession::Get();
@@ -57,7 +67,7 @@ public:
     virtual void Tick(const FGeometry& G,double Time,float Delta) override
     {
         SEditorViewport::Tick(G,Time,Delta);auto& S=PoseDoll::FSession::Get();
-        if (Mesh && (LastApplied!=S.Applied || !Mesh->GetRelativeTransform().Equals(S.Placement)))
+        if (Mesh && LastPreviewRevision!=S.PreviewRevision)
         {
             const double Begin=FPlatformTime::Seconds();const auto& Ref=Mesh->GetSkinnedAsset()->GetRefSkeleton();
             for (int32 I=0;I<Ref.GetNum();++I)
@@ -69,7 +79,7 @@ public:
                     Mesh->BoneSpaceTransforms[I]=ParentGlobal?Global->GetRelativeTransform(*ParentGlobal):*Global;
                 }
             }
-            Mesh->MarkRefreshTransformDirty();Mesh->RefreshBoneTransforms();Mesh->SetRelativeTransform(S.Placement);LastApplied=S.Applied;S.RecordPreview((FPlatformTime::Seconds()-Begin)*1000);
+            Mesh->MarkRefreshTransformDirty();Mesh->RefreshBoneTransforms();LastPreviewRevision=S.PreviewRevision;S.RecordPreview((FPlatformTime::Seconds()-Begin)*1000);
         }
     }
 protected:
@@ -78,7 +88,7 @@ private:
     TUniquePtr<FPreviewScene> Scene;
     TSharedPtr<FPoseViewportClient> Client;
     UPoseableMeshComponent* Mesh=nullptr;
-    uint64 LastApplied=MAX_uint64;
+    uint64 LastPreviewRevision=MAX_uint64;
 };
 class SPosePanel : public SCompoundWidget
 {
@@ -86,11 +96,6 @@ public:
     SLATE_BEGIN_ARGS(SPosePanel){} SLATE_END_ARGS()
     void Construct(const FArguments&)
     {
-        // The companion simulator is normally foreground while the editor previews.
-        // Keep the user's preference in memory and restore it when this panel closes.
-        auto* Performance=GetMutableDefault<UEditorPerformanceSettings>();
-        bPreviousBackgroundThrottle=Performance->bThrottleCPUWhenNotForeground;
-        Performance->bThrottleCPUWhenNotForeground=false;
         for (const TCHAR* M:{TEXT("FullBody"),TEXT("UpperBody"),TEXT("LowerBody"),TEXT("arm_l"),TEXT("arm_r"),TEXT("leg_l"),TEXT("leg_r"),TEXT("Custom")}) Masks.Add(MakeShared<FString>(M));
         TSharedRef<SWrapBox> PartPicker=SNew(SWrapBox).UseAllottedSize(true);
         for(const auto& Part:PoseDoll::FSession::PartOptions())
@@ -148,9 +153,8 @@ public:
         SCompoundWidget::Tick(Geometry,Time,Delta);
         if(Time-LastDiagnostic>.25){LastDiagnostic=Time;Diagnostic=FText::FromString(PoseDoll::FSession::Get().DiagnosticText());}
     }
-    ~SPosePanel() {GetMutableDefault<UEditorPerformanceSettings>()->bThrottleCPUWhenNotForeground=bPreviousBackgroundThrottle;PoseDoll::FSession::Get().Shutdown();}
+    ~SPosePanel() {PoseDoll::FSession::Get().Shutdown();}
 private:
-    bool bPreviousBackgroundThrottle=true;
     FText Diagnostic;
     double LastDiagnostic=0;
     TSharedRef<SWidget> Button(const FString& Label,const FString& Action,const FString& Argument=TEXT(""))
@@ -170,9 +174,9 @@ public:
     virtual void StartupModule() override
     {
         TickHandle=FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float Dt){return PoseDoll::FSession::Get().Tick(Dt);}));
-        ReplacedHandle=FCoreUObjectDelegates::OnObjectsReplaced.AddLambda([](const TMap<UObject*,UObject*>& Replaced){auto& S=PoseDoll::FSession::Get();if(S.Adapter && (Replaced.Contains(S.Adapter->GetRig()) || Replaced.Contains(S.Adapter->GetRig()->GetClass()) || Replaced.Contains(S.Component.Get()))){S.Shutdown();S.State=TEXT("Fault");S.Error=TEXT("Target/Rig was recompiled or replaced; rebind and validate before resuming");}});
+        ReplacedHandle=FCoreUObjectDelegates::OnObjectsReplaced.AddLambda([](const TMap<UObject*,UObject*>& Replaced){auto& S=PoseDoll::FSession::Get();if(S.Adapter && (Replaced.Contains(S.Adapter->GetRig()) || Replaced.Contains(S.Adapter->GetRig()->GetClass()) || Replaced.Contains(S.Component.Get()))){S.Shutdown();S.State=TEXT("Fault");S.Error=TEXT("Target/Rig was recompiled or replaced; rebind and validate before capturing");}});
         UndoHandle=FEditorDelegates::PostUndoRedo.AddLambda([]{PoseDoll::FSession::Get().AfterUndoRedo();});
-        ModifiedHandle=FCoreUObjectDelegates::OnObjectModified.AddLambda([](UObject* Object){auto& S=PoseDoll::FSession::Get();S.ObserveObjectModified(Object);if(S.Adapter && Object==S.Adapter->GetRig()->GetClass()->ClassGeneratedBy){S.Shutdown();S.State=TEXT("Fault");S.Error=TEXT("Target Rig asset changed; rebind and validate before resuming");}});
+        ModifiedHandle=FCoreUObjectDelegates::OnObjectModified.AddLambda([](UObject* Object){auto& S=PoseDoll::FSession::Get();S.ObserveObjectModified(Object);if(S.Adapter && Object==S.Adapter->GetRig()->GetClass()->ClassGeneratedBy){S.Shutdown();S.State=TEXT("Fault");S.Error=TEXT("Target Rig asset changed; rebind and validate before capturing");}});
         FGlobalTabmanager::Get()->RegisterNomadTabSpawner(TEXT("PoseDollLab"),FOnSpawnTab::CreateLambda([](const FSpawnTabArgs&){return SNew(SDockTab).TabRole(ETabRole::NomadTab)[SNew(SPosePanel)];})).SetDisplayName(FText::FromString(TEXT("PoseDoll Lab")));
         UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this,&FPoseDollEditorModule::RegisterMenus));
     }

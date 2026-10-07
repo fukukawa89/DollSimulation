@@ -25,7 +25,7 @@ bool FSession::SetCustomParts(const TSet<FString>& Parts)
     for(const FString& Part:Parts)
         if(!PartOptions().ContainsByPredicate([&](const auto& P){return P.Key==Part;}))
         {Error=TEXT("Unknown capture part: ")+Part;return false;}
-    InvalidateSnapshotContext();Freeze();CustomParts=Parts;Mask=TEXT("Custom");bValid=false;Error.Empty();return true;
+    InvalidateSnapshotContext();CustomParts=Parts;Mask=TEXT("Custom");bValid=false;Error.Empty();return true;
 }
 void FSession::TogglePart(const FString& Part,bool Enabled)
 {

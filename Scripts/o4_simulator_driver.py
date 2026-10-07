@@ -1,11 +1,12 @@
 """External Python helper for real-UE tests. It owns only the simulated sensor TCP server."""
 import sys,time,json,argparse
 from pathlib import Path
-ap=argparse.ArgumentParser();ap.add_argument('--root',type=Path,required=True);ap.add_argument('--control-dir',type=Path,required=True);a=ap.parse_args();root=a.root
+ap=argparse.ArgumentParser();ap.add_argument('--root',type=Path,required=True);ap.add_argument('--control-dir',type=Path,required=True);ap.add_argument('--stream',action='store_true');a=ap.parse_args();root=a.root
 sys.path.insert(0,str(root/'Tools/PoseDollSimulator/src'))
 from posedoll_sim.core import DeviceProfile,SensorDecoder
 from posedoll_sim.static_transport import StaticSensorServer
-server=StaticSensorServer(DeviceProfile(root/'Shared'));server.start()
+from posedoll_sim.transport import SensorServer
+server=(SensorServer if a.stream else StaticSensorServer)(DeviceProfile(root/'Shared'));server.start()
 report=a.control_dir;report.mkdir(parents=True,exist_ok=True);(report/'o4_source_ready').write_text('ready')
 seen=set();done=False
 try:
@@ -22,4 +23,4 @@ try:
             seen.add(control.name);(report/(data['id']+'.ack')).write_text('ack')
         time.sleep(.005)
 finally:
-    server.close();(report/'o4_source_result.json').write_text(json.dumps({'sent':server.sent,'requests':server.request_count,'error':server.error}),encoding='utf-8')
+    server.close();(report/'o4_source_result.json').write_text(json.dumps({'sent':server.sent,'requests':getattr(server,'request_count',0),'error':server.error}),encoding='utf-8')

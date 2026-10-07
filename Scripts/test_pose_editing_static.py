@@ -1,4 +1,4 @@
-"""Real UE + simulated PDS1: button capture, manual edits, masks and cancellation.
+"""Real UE + simulated PDS1/stream: one-shot capture, editing and cancellation.
 Creates a unique test map/sequence; never requires a physical doll.
 """
 import json, math, os, subprocess, time, traceback, uuid
@@ -61,7 +61,14 @@ try:
     # Moving a source without clicking must never author animation.
     for _ in range(5):cmd('tick');time.sleep(.02)
     assert channels()==initial
-    cmd('resume',ok=False);cmd('snapshot_clutch',ok=False)
+    before=cmd('status')
+    assert before['capture_mode']=='OneShot' and 'live' not in before
+    assert before['applied']==0
+    for action in ('resume','freeze','snapshot_clutch','contact','placement'):
+        rejected=cmd(action,ok=False)
+        assert rejected['error']=='Unknown session action',(action,rejected)
+    assert cmd('status')['applied']==0 and channels()==initial
+    report['cases'].append('retired continuous/Clutch/contact/placement commands cannot apply or key a pose')
     cid=cmd('capture_current',{'advance':4})['capture_id']
     assert cmd('capture_current',{'advance':4})['capture_id']==cid
     accepted=pump(lambda s:s['snapshot_state'] in ('Committed','Fault','Cancelled','TimedOut'))
@@ -70,9 +77,13 @@ try:
     assert unreal.LevelSequenceEditorBlueprintLibrary.get_current_time()==16
     report['cases'].append('one click commits once and advances at 24000/1001 fps; duplicate click idempotent')
     keys=channels()
+    applied=cmd('status')['applied']
+    held_pose=cmd('pose_report',ok=None)
     source(fixture='neutral.sample.json')
     for _ in range(20):cmd('tick');time.sleep(.01)
     assert channels()==keys
+    assert cmd('status')['applied']==applied
+    assert cmd('pose_report',ok=None)==held_pose
     report['cases'].append('source changes and idle ticks do not overwrite keyed pose')
     cmd('custom_parts',{'parts':['hand_l']})
     cmd('capture_current');accepted=pump(lambda s:s['snapshot_state'] in ('Committed','Fault','Cancelled','TimedOut'))
@@ -110,6 +121,35 @@ try:
         assert result['captures']==count and channels()==before,(fault,result)
         report['cases'].append('invalid sample rejected: '+fault)
         source(fault='');cmd('disconnect');cmd('connect','static');pump(lambda s:s.get('static_source') and s['state']=='Ready')
+    # The simulator can still send continuously; the session must only buffer it.
+    cmd('disconnect');source(stop=True);proc.wait(timeout=5);proc=None
+    CONTROL=ROOT/'reports/pose_editing_static_source'/(RUN+'_stream')
+    CONTROL.mkdir(parents=True)
+    proc=subprocess.Popen([python,'-X','utf8',str(ROOT/'Scripts/o4_simulator_driver.py'),'--root',str(ROOT),'--control-dir',str(CONTROL),'--stream'],creationflags=0x08000000)
+    end=time.monotonic()+5
+    while not (CONTROL/'o4_source_ready').exists():
+        assert time.monotonic()<end
+        time.sleep(.01)
+    cmd('mask','FullBody')
+    source(fixture='asymmetric_pose.sample.json')
+    before=cmd('status');held_keys=channels();held_pose=cmd('pose_report',ok=None)
+    cmd('connect');ready=pump(lambda s:s['state']=='Ready' and s.get('received',0)>=10)
+    assert not ready['static_source']
+    assert ready['applied']==before['applied'] and ready['captures']==before['captures']
+    assert channels()==held_keys and cmd('pose_report',ok=None)==held_pose
+    report['cases'].append('continuous simulator input only buffers until explicit capture')
+    first=cmd('capture_current')
+    assert first['applied']==before['applied']+1 and first['captures']==before['captures']+1
+    held_keys=channels();held_pose=cmd('pose_report',ok=None)
+    source(fixture='neutral.sample.json')
+    later=pump(lambda s:s.get('received',0)>=first['received']+20)
+    assert later['applied']==first['applied'] and later['captures']==first['captures']
+    assert channels()==held_keys and cmd('pose_report',ok=None)==held_pose
+    report['cases'].append('new streaming samples cannot overwrite the last captured pose')
+    second=cmd('capture_current')
+    assert second['applied']==first['applied']+1 and second['captures']==first['captures']+1
+    assert channels()!=held_keys and cmd('pose_report',ok=None)!=held_pose
+    report['cases'].append('each explicit click commits the latest buffered sample once')
     report['passed']=True
 except Exception:
     report['exception']=traceback.format_exc();unreal.log_error(report['exception'])
