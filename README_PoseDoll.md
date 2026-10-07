@@ -1,6 +1,6 @@
 # PoseDoll Lab
 
-本工程包含中文机械人偶模拟器和 UE 5.8.2 PoseDoll 插件。人偶通过按钮采集姿势，结果写成可继续编辑的原生 Control Rig 关键帧。
+本工程包含中文机械人偶模拟器和 UE 5.8 PoseDoll 插件。人偶通过按钮采集姿势，结果写成可继续编辑的原生 Control Rig 关键帧。
 
 ## 使用
 
@@ -24,6 +24,25 @@
 **采集是覆盖所选关节的相对转角。** 例如只采左手腕，会把人偶手相对前臂的朝向写入角色左手腕，不会把人偶整条手臂的全局朝向带过来，也不会在已修改的手腕角度上累加。已有角色放置、骨骼比例和无关肢体的控制数据保留。
 
 选中父关节后，子关节会按正常层级跟随。例如转动肩膀会带动手腕的位置；未选中不等于锁定世界位置。转换 IK 链时，为保持姿势，同一条链中未选关节的 FK 控制通道也可能需要匹配关键帧。
+
+## 手部预设
+
+主面板只增加「手部预设…」入口，筛选和预览位于独立二级窗口。绑定角色和序列后，无需连接人偶即可使用。
+
+1. 选择左手、右手或双手。
+2. 一级按「伸出 / 半弯 / 蜷曲」的数量筛选；不限的状态可保留「不限」。二级选择拇指、食指、中指、无名指、小指分别处于哪一种状态。两层条件同时生效，可一键重置。
+3. 点击图片查看放大效果。卡片不显示手势名称；当前库包含 125 个独立手形、65 种状态组合，左右手各有一张对应的实际 UE 图片。同一组合内的自然微弯、笔直、张合等变体相邻排列；自然微弯与笔直都归入“伸出”。
+4. 暂停 Sequencer，将播放头置于整数显示帧，点击「应用到左手 / 右手 / 双手」。每次应用支持一次撤销和重做。可选择保持姿势或线性过渡。
+
+应用完整替换所选手的手指与掌骨控制值，保留手腕、身体及另一只手。A→B→A 或重复应用 A 都不会叠加旋转。预设写入原生 Control Rig 关键帧，保存序列后可继续手工修改；后续身体采集保留手指控制数据。首次应用可创建兼容的 Rig 轨道；预设功能沿用绑定、只读、section 和通道校验。
+
+预设由本项目直接在 Manny 上制作，并非外部软件手姿文件的精确导入。`Resources/HandPresets/presets.json` 存储完整控制器变换与 E/B/C 分类；缩略图由同一组变换在 Unreal 的 `SceneCapture2D` 中生成，使用实际 `SKM_Manny_Simple` 材质和变形。五根手指的 curl 控件是不可关键帧化的代理，覆盖的是它们驱动的 19 个实际动画控制器。每张图片附有引擎、Mesh、Rig、预设及控制值 hash 记录。
+
+预设覆盖自然微弯与笔直伸出、并拢与张开、指根弯与指尖弯、松紧握、拇指位置、混合伸出和指尖接触。原有 61 个预设的控制值和 ID 保持稳定。
+
+修改 `Scripts/build_hand_preset_library.py` 中的手形配方后，在普通 Python 运行 `Scripts/build_hand_preset_library.py` 可重建库；随后必须在开启渲染的 Unreal Editor 内运行 `Scripts/render_hand_presets.py` 重新生成图片（不可使用 `-NullRHI`）。将整个 `Plugins/PoseDoll/Resources/HandPresets` 目录随插件复制。修改库后先关闭手部窗口，通过 `hand_presets` 的 `reload` 动作重新加载数据，再打开窗口；重启编辑器也会加载新库。
+
+`Scripts/hand_preset_calibration.json` 保存实际 Manny 骨骼校准，`Scripts/hand_contact_calibration.json` 保存指尖接触校准。对应的 `calibrate_hand_straight.py` 和 `calibrate_hand_contacts.py` 只在临时 Control Rig 中试算，将结果写入 `reports` 供检查，验收后再更新保存的数据。
 
 ## IK / FK 与手工编辑
 
@@ -56,11 +75,11 @@
 
 ## 支持范围
 
-验证版本：**UE 5.8.2 / CL 56702186**。面板针对项目内 `SKM_Manny_Simple` 和 `CR_Mannequin_Body`；运行时层级、参考变换和类型指纹不匹配时拒绝旧映射。
+验证版本：**UE 5.8.3 / CL 58210709**。面板针对项目内 `SKM_Manny_Simple` 和 `CR_Mannequin_Body`；运行时层级、参考变换和类型指纹不匹配时拒绝旧映射。
 
 支持一个目标绑定上的一条标准、非叠加 Control Rig 轨道，一个有效可写的 section，完整权重，顶层 Level Sequence、有理显示帧率、Constant / Linear 插值、均匀正缩放及非零 Actor / Component 变换。嵌套 focused sequence、时间扭曲、竞争动画轨道、被禁用的必要通道、只读序列、非均匀或负缩放不属于当前支持范围。
 
-手指、面部、第三方 Rig 自动适配、长时间连续录制、实体设备精度和机械制造尚未由本次修改验证。twist / corrective bones 继续由原生 Rig 管理。
+手指姿势传感器采集、面部、第三方 Rig 自动适配、长时间连续录制、实体设备精度和机械制造尚未由本次修改验证。twist / corrective bones 继续由原生 Rig 管理。
 
 ## 构建和验证
 
@@ -70,6 +89,8 @@
 .\Scripts\BuildPoseDoll.ps1 -VerifyUnity
 # 独立进程运行采集、重开和模拟 TCP 验收；可加 -IncludeO22
 .\Scripts\TestPoseDollEditing.ps1
+# 手部替换、隔离、撤销重做、全部预设与保存重开
+.\Scripts\TestHandPresets.ps1
 ```
 
 本次 UE 验收脚本均在独立测试目录创建资产：

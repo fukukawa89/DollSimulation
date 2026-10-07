@@ -1,0 +1,10 @@
+{
+	"renderer": "Unreal Engine SceneCapture2D",
+	"engine": "5.8.3-58210709+++UE5+Release-5.8",
+	"mesh": "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple",
+	"rig_class": "/Game/Characters/Mannequins/Rigs/CR_Mannequin_Body.CR_Mannequin_Body_C",
+	"preset": "hand-030",
+	"states": "EECEE",
+	"side": "r",
+	"controls_sha256": "a17aaa41df9c21dae9fc9ae5765ec8615d54d6b608905cbfea5e4c9c5af1cfb3"
+}

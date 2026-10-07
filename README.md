@@ -1,6 +1,6 @@
 # PoseDoll Lab
 
-UE 5.8.2 的机械人偶姿态映射插件，以及独立的中文 Python 桌面模拟器。
+UE 5.8 的机械人偶姿态映射插件，以及独立的中文 Python 桌面模拟器。
 模拟器发送 44 路原始传感器角度，UE 独立完成校准、连续角展开、54 节点 FK 和 Manny Control Rig 映射，并将姿势捕获为可编辑的 Sequencer 关键帧。
 
 ## 仓库内容
@@ -12,7 +12,7 @@ UE 5.8.2 的机械人偶姿态映射插件，以及独立的中文 Python 桌面
 - `Scripts`：安装、构建、启动及 UE 集成验证脚本。
 - `Source`、`Config`、`DollSimulation.uproject`：开发工程的源码和配置。
 
-本仓库只保存源码与文本配置。虚拟环境、编译产物、UE 缓存、测试输出以及 `Content` 中的 Manny、地图和已采集序列均由 `.gitignore` 排除。克隆仓库后需重新创建 Python 环境，并自行准备 UE 项目所需资产。
+本仓库保存源码、文本配置及插件内置的手部预设 PNG。虚拟环境、编译产物、UE 缓存、测试输出以及 `Content` 中的 Manny、地图和已采集序列均由 `.gitignore` 排除。克隆仓库后需重新创建 Python 环境，并自行准备 UE 项目所需资产。
 
 ## Python 模拟器
 
@@ -27,7 +27,7 @@ UE 5.8.2 的机械人偶姿态映射插件，以及独立的中文 Python 桌面
 
 ## UE 插件
 
-验证版本为 **UE 5.8.2 / CL 56702186**。把 `Plugins/PoseDoll` 放到目标工程的 `Plugins` 下，并把 `Shared` 放到工程根目录。启用 Control Rig、Level Sequence Editor 及 PoseDoll，重新生成项目文件并编译。
+验证版本为 **UE 5.8.3 / CL 58210709**。把 `Plugins/PoseDoll` 放到目标工程的 `Plugins` 下，并把 `Shared` 放到工程根目录。启用 Control Rig、Level Sequence Editor 及 PoseDoll，重新生成项目文件并编译。
 
 当前 Manny 配置依赖以下资产，仓库不包含这些二进制资产：
 
@@ -35,6 +35,8 @@ UE 5.8.2 的机械人偶姿态映射插件，以及独立的中文 Python 桌面
 - `/Game/Characters/Mannequins/Rigs/CR_Mannequin_Body`
 
 Rig 层级、控制器与参考变换须符合 `Shared/Profiles/manny_body_ue582_v1.json`；不匹配时需重新验证映射。创建包含目标 Manny 的关卡及顶层 Level Sequence，打开「窗口 → PoseDoll Lab」，绑定所选角色和当前序列，连接模拟器，选择全身、分区或自定义范围后点击采集。已有 Control Rig 可继续手工编辑，采集仅在按钮触发时覆盖所选关节。
+
+绑定后点击主面板「手部预设…」，按手指状态数量和具体手指筛选 125 个原生 Manny 手形。图片来自 Unreal 实际渲染；应用会覆盖当前帧的左手、右手或双手手指，支持撤销，无需连接设备。详细操作见完整使用说明。
 
 仓库中的 `DollSimulation.uproject` 保留原开发工程配置，启用了 MCP 相关开发插件。`PoseDollAutomation` 依赖 `ToolsetRegistry`，仅用于低频状态检查和原生数值验证；普通使用只需主 `PoseDoll` 插件。原开发机的 UE 构建脚本支持指定引擎目录：
 
@@ -53,4 +55,4 @@ Rig 层级、控制器与参考变换须符合 `Shared/Profiles/manny_body_ue582
 - 原生 UE 测试：`Plugins/PoseDoll/Source/PoseDollCore/Private/PoseDollCoreTests.cpp`
 - 当前 UE 集成验证：`Scripts/TestPoseDollEditing.ps1`；在独立编辑器进程运行单次采集、编辑、重开和静态 TCP 回归。其他早期脚本需按历史用途辨别，不能代替当前验收。
 
-当前采集流程与验收脚本见完整使用说明。旧的 Live、Clutch、接触及持续流验收记录仅对应历史版本。仓库不包含生成的日志、截图或报告。
+当前采集流程与验收脚本见完整使用说明。旧的 Live、Clutch、接触及持续流验收记录仅对应历史版本。仓库不包含测试日志或报告；`Plugins/PoseDoll/Resources/HandPresets` 内的 Unreal 手部缩略图是功能资源，随插件分发。

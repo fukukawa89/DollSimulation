@@ -1,6 +1,7 @@
-#include "Modules/ModuleManager.h"
+﻿#include "Modules/ModuleManager.h"
 #include "PoseDollSession.h"
 #include "SPoseDollBodyPicker.h"
+#include "SPoseDollHandPresets.h"
 #include "PoseDollEditorLibrary.h"
 #include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
@@ -180,6 +181,9 @@ public:
                 [SNew(SButton).Text(FText::FromString(TEXT("选择采集部位…")))
                     .ToolTipText(FText::FromString(TEXT("打开骨骼图选择采集部位；关闭窗口后保留选择。")))
                     .OnClicked_Lambda([this]{OpenBodyPicker();return FReply::Handled();})]
+            +SWrapBox::Slot().Padding(0,0,12,4)
+                [SNew(SButton).Text(FText::FromString(TEXT("手部预设…")))
+                    .OnClicked_Lambda([this]{OpenHandPresets();return FReply::Handled();})]
             +SWrapBox::Slot().Padding(0,3,0,4)
                 [SNew(STextBlock)
                     .Text_Lambda([]{return FText::FromString(FString::Printf(TEXT("已选 %d / %d 个部位"),
@@ -229,9 +233,22 @@ public:
     ~SPosePanel()
     {
         if(const auto Window=PartWindow.Pin())Window->RequestDestroyWindow();
+        if(const auto Window=HandWindow.Pin())Window->RequestDestroyWindow();
         PoseDoll::FSession::Get().Shutdown();
     }
 private:
+    void OpenHandPresets()
+    {
+        if(const auto Existing=HandWindow.Pin()){Existing->BringToFront();return;}
+        const auto Window=SNew(SWindow).Title(FText::FromString(TEXT("手部预设")))
+            .ClientSize(FVector2D(1120,720)).MinWidth(1000.f).MinHeight(600.f)
+            .SupportsMinimize(false);
+        HandWindow=Window;
+        Window->SetContent(SNew(PoseDoll::SPoseDollHandPresets).Linear(Linear));
+        if(const auto Parent=FSlateApplication::Get().FindWidgetWindow(AsShared()))
+            FSlateApplication::Get().AddWindowAsNativeChild(Window,Parent.ToSharedRef());
+        else FSlateApplication::Get().AddWindow(Window);
+    }
     void OpenBodyPicker()
     {
         if(const auto Existing=PartWindow.Pin())
@@ -272,7 +289,7 @@ private:
     void Capture(int32 Advance)
     {PoseDoll::FSession::Get().CaptureCurrent(Advance,Linear);}
     TArray<TSharedPtr<FString>> Masks,Transitions;int32 Step=4;bool Linear=false;
-    TWeakPtr<SWindow> PartWindow;
+    TWeakPtr<SWindow> PartWindow,HandWindow;
     TSharedPtr<SComboBox<TSharedPtr<FString>>> MaskCombo;
     bool bSyncingMask=false;
 };

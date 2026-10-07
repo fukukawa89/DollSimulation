@@ -1,0 +1,495 @@
+{
+  "passed": true,
+  "sides": {
+    "l": {
+      "BBEEE": {
+        "controls": {
+          "thumb_01_l_ctrl": [
+            -1.0,
+            -2,
+            -38.5
+          ],
+          "thumb_02_l_ctrl": [
+            0,
+            0,
+            18.75
+          ],
+          "thumb_03_l_ctrl": [
+            0,
+            0,
+            10.0
+          ],
+          "index_01_l_ctrl": [
+            0,
+            0,
+            -25
+          ],
+          "index_02_l_ctrl": [
+            0,
+            0,
+            -30
+          ],
+          "index_03_l_ctrl": [
+            0,
+            0,
+            -15
+          ],
+          "middle_01_l_ctrl": [
+            0,
+            1.246,
+            35.106
+          ],
+          "middle_02_l_ctrl": [
+            0,
+            0,
+            20.77
+          ],
+          "middle_03_l_ctrl": [
+            0,
+            0,
+            10
+          ],
+          "ring_01_l_ctrl": [
+            0,
+            -0.648,
+            32.19
+          ],
+          "ring_02_l_ctrl": [
+            0,
+            0,
+            18.964
+          ],
+          "ring_03_l_ctrl": [
+            0,
+            0,
+            9.168
+          ],
+          "pinky_01_l_ctrl": [
+            0,
+            -3.504,
+            28.374
+          ],
+          "pinky_02_l_ctrl": [
+            0,
+            0,
+            21.286
+          ],
+          "pinky_03_l_ctrl": [
+            0,
+            0,
+            4.918
+          ]
+        },
+        "contact_error_cm": 0.5042156074601527,
+        "finger_tip_separation_cm": 0.0
+      },
+      "BEBEE": {
+        "controls": {
+          "thumb_01_l_ctrl": [
+            22.35,
+            -5.75,
+            -46.8
+          ],
+          "thumb_02_l_ctrl": [
+            0,
+            0,
+            13.25
+          ],
+          "thumb_03_l_ctrl": [
+            0,
+            0,
+            10.0
+          ],
+          "index_01_l_ctrl": [
+            0,
+            4.756,
+            28.738
+          ],
+          "index_02_l_ctrl": [
+            0,
+            0,
+            14.892
+          ],
+          "index_03_l_ctrl": [
+            0,
+            0,
+            12.516
+          ],
+          "middle_01_l_ctrl": [
+            0,
+            0,
+            -25
+          ],
+          "middle_02_l_ctrl": [
+            0,
+            0,
+            -30
+          ],
+          "middle_03_l_ctrl": [
+            0,
+            0,
+            -15
+          ],
+          "ring_01_l_ctrl": [
+            0,
+            -0.648,
+            32.19
+          ],
+          "ring_02_l_ctrl": [
+            0,
+            0,
+            18.964
+          ],
+          "ring_03_l_ctrl": [
+            0,
+            0,
+            9.168
+          ],
+          "pinky_01_l_ctrl": [
+            0,
+            -3.504,
+            28.374
+          ],
+          "pinky_02_l_ctrl": [
+            0,
+            0,
+            21.286
+          ],
+          "pinky_03_l_ctrl": [
+            0,
+            0,
+            4.918
+          ]
+        },
+        "contact_error_cm": 0.3965900672017058,
+        "finger_tip_separation_cm": 0.0
+      },
+      "BBBEE": {
+        "controls": {
+          "thumb_01_l_ctrl": [
+            -3.0,
+            -2,
+            -42.2
+          ],
+          "thumb_02_l_ctrl": [
+            0,
+            0,
+            14.75
+          ],
+          "thumb_03_l_ctrl": [
+            0,
+            0,
+            10.0
+          ],
+          "index_01_l_ctrl": [
+            0,
+            8,
+            -25
+          ],
+          "index_02_l_ctrl": [
+            0,
+            0,
+            -30
+          ],
+          "index_03_l_ctrl": [
+            0,
+            0,
+            -15
+          ],
+          "middle_01_l_ctrl": [
+            0,
+            -5,
+            -25
+          ],
+          "middle_02_l_ctrl": [
+            0,
+            0,
+            -30
+          ],
+          "middle_03_l_ctrl": [
+            0,
+            0,
+            -15
+          ],
+          "ring_01_l_ctrl": [
+            0,
+            -0.648,
+            32.19
+          ],
+          "ring_02_l_ctrl": [
+            0,
+            0,
+            18.964
+          ],
+          "ring_03_l_ctrl": [
+            0,
+            0,
+            9.168
+          ],
+          "pinky_01_l_ctrl": [
+            0,
+            -3.504,
+            28.374
+          ],
+          "pinky_02_l_ctrl": [
+            0,
+            0,
+            21.286
+          ],
+          "pinky_03_l_ctrl": [
+            0,
+            0,
+            4.918
+          ]
+        },
+        "contact_error_cm": 0.39528169570195565,
+        "finger_tip_separation_cm": 0.8787913453481145
+      }
+    },
+    "r": {
+      "BBEEE": {
+        "controls": {
+          "thumb_01_r_ctrl": [
+            -1.0,
+            -2,
+            -38.5
+          ],
+          "thumb_02_r_ctrl": [
+            0,
+            0,
+            18.75
+          ],
+          "thumb_03_r_ctrl": [
+            0,
+            0,
+            10.0
+          ],
+          "index_01_r_ctrl": [
+            0,
+            0,
+            -25
+          ],
+          "index_02_r_ctrl": [
+            0,
+            0,
+            -30
+          ],
+          "index_03_r_ctrl": [
+            0,
+            0,
+            -15
+          ],
+          "middle_01_r_ctrl": [
+            0,
+            1.246,
+            35.11
+          ],
+          "middle_02_r_ctrl": [
+            0,
+            0.002,
+            20.768
+          ],
+          "middle_03_r_ctrl": [
+            0,
+            0,
+            10.002
+          ],
+          "ring_01_r_ctrl": [
+            0,
+            -0.648,
+            32.192
+          ],
+          "ring_02_r_ctrl": [
+            0,
+            0,
+            18.962
+          ],
+          "ring_03_r_ctrl": [
+            0,
+            0,
+            9.17
+          ],
+          "pinky_01_r_ctrl": [
+            0,
+            -3.504,
+            28.376
+          ],
+          "pinky_02_r_ctrl": [
+            0,
+            -0.002,
+            21.288
+          ],
+          "pinky_03_r_ctrl": [
+            0,
+            0,
+            4.916
+          ]
+        },
+        "contact_error_cm": 0.5040818949771416,
+        "finger_tip_separation_cm": 0.0
+      },
+      "BEBEE": {
+        "controls": {
+          "thumb_01_r_ctrl": [
+            22.35,
+            -5.75,
+            -46.8
+          ],
+          "thumb_02_r_ctrl": [
+            0,
+            0,
+            13.25
+          ],
+          "thumb_03_r_ctrl": [
+            0,
+            0,
+            10.0
+          ],
+          "index_01_r_ctrl": [
+            0,
+            4.756,
+            28.74
+          ],
+          "index_02_r_ctrl": [
+            0,
+            0,
+            14.892
+          ],
+          "index_03_r_ctrl": [
+            0,
+            0,
+            12.518
+          ],
+          "middle_01_r_ctrl": [
+            0,
+            0,
+            -25
+          ],
+          "middle_02_r_ctrl": [
+            0,
+            0,
+            -30
+          ],
+          "middle_03_r_ctrl": [
+            0,
+            0,
+            -15
+          ],
+          "ring_01_r_ctrl": [
+            0,
+            -0.648,
+            32.192
+          ],
+          "ring_02_r_ctrl": [
+            0,
+            0,
+            18.962
+          ],
+          "ring_03_r_ctrl": [
+            0,
+            0,
+            9.17
+          ],
+          "pinky_01_r_ctrl": [
+            0,
+            -3.504,
+            28.376
+          ],
+          "pinky_02_r_ctrl": [
+            0,
+            -0.002,
+            21.288
+          ],
+          "pinky_03_r_ctrl": [
+            0,
+            0,
+            4.916
+          ]
+        },
+        "contact_error_cm": 0.3964379016667089,
+        "finger_tip_separation_cm": 0.0
+      },
+      "BBBEE": {
+        "controls": {
+          "thumb_01_r_ctrl": [
+            -3.0,
+            -2,
+            -42.2
+          ],
+          "thumb_02_r_ctrl": [
+            0,
+            0,
+            14.75
+          ],
+          "thumb_03_r_ctrl": [
+            0,
+            0,
+            10.0
+          ],
+          "index_01_r_ctrl": [
+            0,
+            8,
+            -25
+          ],
+          "index_02_r_ctrl": [
+            0,
+            0,
+            -30
+          ],
+          "index_03_r_ctrl": [
+            0,
+            0,
+            -15
+          ],
+          "middle_01_r_ctrl": [
+            0,
+            -5,
+            -25
+          ],
+          "middle_02_r_ctrl": [
+            0,
+            0,
+            -30
+          ],
+          "middle_03_r_ctrl": [
+            0,
+            0,
+            -15
+          ],
+          "ring_01_r_ctrl": [
+            0,
+            -0.648,
+            32.192
+          ],
+          "ring_02_r_ctrl": [
+            0,
+            0,
+            18.962
+          ],
+          "ring_03_r_ctrl": [
+            0,
+            0,
+            9.17
+          ],
+          "pinky_01_r_ctrl": [
+            0,
+            -3.504,
+            28.376
+          ],
+          "pinky_02_r_ctrl": [
+            0,
+            -0.002,
+            21.288
+          ],
+          "pinky_03_r_ctrl": [
+            0,
+            0,
+            4.916
+          ]
+        },
+        "contact_error_cm": 0.3951436798157507,
+        "finger_tip_separation_cm": 0.8788113058331167
+      }
+    }
+  }
+}

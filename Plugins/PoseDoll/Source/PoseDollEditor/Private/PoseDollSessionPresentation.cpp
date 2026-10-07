@@ -37,6 +37,7 @@ FString FSession::UserStatusLabel() const
     }
     if(!Sequence.IsValid()||!Component.IsValid())return TEXT("请选择角色并打开序列，然后点击“绑定所选角色 / 当前序列”。");
     if(State==TEXT("Captured")||State==TEXT("SnapshotCommitted"))return TEXT("采集成功，可在 Sequencer 中检查和编辑姿势。");
+    if(State==TEXT("HandPresetApplied"))return TEXT("手部预设已写入当前帧，可继续编辑或采集身体姿势。");
     if(bFixture)return TEXT("离线测试姿势已就绪，点击采集可写入当前帧。");
     if(!Input)return TEXT("请连接静态人偶，再摆姿采集。");
     if(!Input->Snapshot().bConnected)return TEXT("正在连接，请检查设备及采集程序。");

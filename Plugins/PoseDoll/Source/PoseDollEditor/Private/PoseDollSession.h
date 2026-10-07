@@ -8,6 +8,7 @@
 
 namespace PoseDoll
 {
+enum class EHandSide : uint8;
 class FSession
 {
 public:
@@ -18,6 +19,7 @@ public:
     bool Connect(uint16 Port=39177);
     void Disconnect();
     bool CaptureCurrent(int32 Advance=0,bool Linear=false);
+    bool ApplyHandPreset(const FString& Id,EHandSide Side,bool Linear=false);
     bool SetCustomParts(const TSet<FString>& Parts);
     TSet<FString> GetSelectedParts() const;
     void TogglePart(const FString& Part,bool Enabled);

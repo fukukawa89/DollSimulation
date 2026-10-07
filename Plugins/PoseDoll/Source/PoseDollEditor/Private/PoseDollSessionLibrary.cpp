@@ -1,5 +1,6 @@
-#include "PoseDollEditorLibrary.h"
+﻿#include "PoseDollEditorLibrary.h"
 #include "PoseDollSession.h"
+#include "PoseDollHandPresets.h"
 #include "LevelSequenceEditorBlueprintLibrary.h"
 #include "MovieSceneSequencePlayer.h"
 #include "Editor.h"
@@ -10,6 +11,28 @@ bool UPoseDollEditorLibrary::BindTarget(ULevelSequence* Sequence,USkeletalMeshCo
 FString UPoseDollEditorLibrary::SessionCommand(const FString& Action,const FString& Argument)
 {
     auto& S=PoseDoll::FSession::Get();bool Ok=true;
+    if (Action==TEXT("hand_presets"))
+    {
+        if(Argument==TEXT("reload"))PoseDoll::FHandPresetLibrary::Get().Reset();
+        if(!PoseDoll::FHandPresetLibrary::Get().Load(S.Error))return S.StatusJson();
+        return PoseDoll::FHandPresetLibrary::Get().Report();
+    }
+    if (Action==TEXT("hand_apply"))
+    {
+        TSharedPtr<FJsonObject> O;FString E,Id,Side;bool Linear=false;
+        if(!PoseDoll::ReadJson(Argument,O,E)||!O->TryGetStringField(TEXT("preset"),Id)||!O->TryGetStringField(TEXT("side"),Side)||
+           (Side!=TEXT("left")&&Side!=TEXT("right")&&Side!=TEXT("both")))
+        {Ok=false;S.Error=TEXT("Expected a hand preset id and side: left, right or both");}
+        else{O->TryGetBoolField(TEXT("linear"),Linear);Ok=S.ApplyHandPreset(Id,Side==TEXT("left")?PoseDoll::EHandSide::Left:Side==TEXT("right")?PoseDoll::EHandSide::Right:PoseDoll::EHandSide::Both,Linear);}
+        TSharedPtr<FJsonObject> Result;PoseDoll::ReadJson(S.StatusJson(),Result,E);Result->SetBoolField(TEXT("ok"),Ok);return PoseDoll::JsonString(Result.ToSharedRef());
+    }
+    if (Action==TEXT("hand_render_thumbnails"))
+    {
+        int32 Start=0,Count=4;TSharedPtr<FJsonObject> Args;FString ParseError;
+        if(!Argument.IsEmpty()&&PoseDoll::ReadJson(Argument,Args,ParseError)){Args->TryGetNumberField(TEXT("start"),Start);Args->TryGetNumberField(TEXT("count"),Count);}
+        Ok=S.Initialize()&&PoseDoll::FHandPresetLibrary::Get().Load(S.Error)&&PoseDoll::FHandPresetLibrary::Get().RenderThumbnails(S.Adapter->GetRig(),S.Adapter->GetMesh(),S.Error,Start,Count);
+        TSharedPtr<FJsonObject> Result;FString E;PoseDoll::ReadJson(S.StatusJson(),Result,E);Result->SetBoolField(TEXT("ok"),Ok);return PoseDoll::JsonString(Result.ToSharedRef());
+    }
     if (Action==TEXT("key_report")) return S.KeyReport();
     if (Action==TEXT("pose_report")) return S.PoseReport();
     if (Action==TEXT("connect")) Ok=S.Connect(Argument==TEXT("static")?39178:39177);
