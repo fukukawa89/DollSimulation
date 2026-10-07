@@ -115,12 +115,13 @@ bool FSession::LoadFixture(const FString& Filename)
 {
     if (FPaths::GetCleanFilename(Filename)!=Filename || !Filename.EndsWith(TEXT(".sample.json"))) {Error=TEXT("Fixture must be a bundled sample filename");return false;}
     if (!Initialize()) return false;
-    CancelSnapshot(TEXT("Loading fixture"));bSnapshotEligible=false;Decoder.Reset();TSharedPtr<FJsonObject> Hello,Raw;FIdentity ID;FSample Sample;
+    TSharedPtr<FJsonObject> Hello,Raw;FIdentity ID;FSample Sample;
     const FString Root=FPaths::ProjectDir()/TEXT("Shared/Fixtures");
     if (!LoadJson(Root/TEXT("hello.json"),Hello,Error) || !Handshake(Profile,*Hello,ID,Error) || !LoadJson(Root/Filename,Raw,Error) || !ParseSample(Profile,ID,*Raw,Sample,Error)) return false;
-    Sample.ReceivedSeconds=FPlatformTime::Seconds();bFixture=true;
+    // A fixture is an explicit source switch, not an overlay on a live transport.
+    Disconnect();Sample.ReceivedSeconds=FPlatformTime::Seconds();
     if (!Apply(Sample,ID)) return false;
-    State=TEXT("PoseReady");return true;
+    bFixture=true;State=TEXT("PoseReady");Error.Empty();return true;
 }
 bool FSession::ValidateTarget(bool ForCapture)
 {
@@ -318,6 +319,7 @@ bool FSession::Capture(int32 Frame,int32 Advance,bool Linear)
 FString FSession::StatusJson() const
 {
     auto O=MakeShared<FJsonObject>();O->SetStringField(TEXT("state"),State);O->SetStringField(TEXT("error"),Error);O->SetStringField(TEXT("editing_note"),EditingNote);O->SetBoolField(TEXT("valid"),bValid);O->SetStringField(TEXT("capture_mode"),TEXT("OneShot"));O->SetNumberField(TEXT("applied"),Applied);O->SetNumberField(TEXT("invalid"),Invalid);O->SetNumberField(TEXT("captures"),Captures);O->SetStringField(TEXT("mask"),Mask);
+    O->SetStringField(TEXT("source_label"),SourceLabel());O->SetStringField(TEXT("user_status"),UserStatusLabel());
     TArray<TSharedPtr<FJsonValue>> Parts;for(const FString& P:CustomParts)Parts.Add(MakeShared<FJsonValueString>(P));O->SetArrayField(TEXT("custom_parts"),Parts);O->SetStringField(TEXT("sequence"),Sequence.IsValid()?Sequence->GetPathName():TEXT(""));O->SetStringField(TEXT("binding"),Binding.ToString());
     O->SetStringField(TEXT("snapshot_state"),StaticWindow.State);O->SetStringField(TEXT("capture_id"),StaticWindow.CaptureId);O->SetBoolField(TEXT("has_snapshot"),bHasSnapshot);O->SetBoolField(TEXT("snapshot_eligible"),bSnapshotEligible);O->SetStringField(TEXT("snapshot_captured_utc"),SnapshotCapturedUtc);O->SetNumberField(TEXT("snapshot_target_frame"),SnapshotFrame);O->SetNumberField(TEXT("snapshot_stable_us"),StaticWindow.StableMicros);O->SetNumberField(TEXT("snapshot_peak_deg"),StaticWindow.PeakDegrees);O->SetNumberField(TEXT("snapshot_drift_deg_s"),StaticWindow.DriftDegreesPerSecond);
     if(bHasSnapshot){O->SetNumberField(TEXT("snapshot_age_ms"),(FPlatformTime::Seconds()-HistoricalReceived)*1000);O->SetStringField(TEXT("snapshot_scan_id"),FString::Printf(TEXT("%llu"),HistoricalSnapshot.ScanId));}

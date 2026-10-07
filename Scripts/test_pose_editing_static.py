@@ -55,7 +55,9 @@ try:
     assert unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(seq)
     assert unreal.PoseDollEditorLibrary.bind_target(seq,actor.skeletal_mesh_component)
     unreal.LevelSequenceEditorBlueprintLibrary.set_current_time(12)
-    cmd('connect','static');pump(lambda s:s.get('static_source') and s['state']=='Ready')
+    cmd('connect','static');ready=pump(lambda s:s.get('static_source') and s['state']=='Ready')
+    assert ready['source_label']=='数据来源：模拟器（静态测试）',ready
+    report['cases'].append('simulated PDS1 source is visibly identified as test data')
     initial=channels()
     source(fixture='asymmetric_pose.sample.json')
     # Moving a source without clicking must never author animation.
@@ -75,6 +77,10 @@ try:
     assert accepted['snapshot_state']=='Committed',accepted
     assert accepted['captures']==1
     assert unreal.LevelSequenceEditorBlueprintLibrary.get_current_time()==16
+    modes={k.get_interpolation_mode() for c in track.get_sections()[0].get_all_channels()
+           if isinstance(c,(unreal.MovieSceneScriptingFloatChannel,unreal.MovieSceneScriptingDoubleChannel)) for k in c.get_keys()
+           if k.get_time().frame_number.value==12}
+    assert modes=={unreal.RichCurveInterpMode.RCIM_CONSTANT},modes
     report['cases'].append('one click commits once and advances at 24000/1001 fps; duplicate click idempotent')
     keys=channels()
     applied=cmd('status')['applied']
@@ -86,10 +92,15 @@ try:
     assert cmd('pose_report',ok=None)==held_pose
     report['cases'].append('source changes and idle ticks do not overwrite keyed pose')
     cmd('custom_parts',{'parts':['hand_l']})
-    cmd('capture_current');accepted=pump(lambda s:s['snapshot_state'] in ('Committed','Fault','Cancelled','TimedOut'))
+    cmd('capture_current',{'linear':True});accepted=pump(lambda s:s['snapshot_state'] in ('Committed','Fault','Cancelled','TimedOut'))
     assert accepted['snapshot_state']=='Committed',accepted
     after=channels()
     assert all(after[n]==v for n,v in keys.items() if not n.startswith('hand_l_fk_ctrl'))
+    modes={k.get_interpolation_mode() for c in track.get_sections()[0].get_all_channels()
+           if str(c.channel_name).startswith('hand_l_fk_ctrl') for k in c.get_keys()
+           if k.get_time().frame_number.value==16}
+    assert modes=={unreal.RichCurveInterpMode.RCIM_LINEAR},modes
+    report['cases'].append('hold and linear transition settings author the corresponding key interpolation')
     report['cases'].append('static wrist-only capture changes only selected FK rotation channels')
     count=cmd('status')['captures']
     for change in ('manual_edit','time','mask','target','disconnect'):
@@ -120,6 +131,14 @@ try:
         assert result['captures']==count and channels()==before,(fault,result)
         report['cases'].append('invalid sample rejected: '+fault)
         source(fault='');cmd('disconnect');cmd('connect','static');pump(lambda s:s.get('static_source') and s['state']=='Ready')
+    # Loading a fixture while connected must select the offline source exclusively.
+    offline=cmd('fixture','neutral.sample.json')
+    assert offline['source_label']=='数据来源：离线测试' and 'static_source' not in offline,offline
+    for _ in range(20):cmd('tick');time.sleep(.01)
+    assert cmd('status')['source_label']=='数据来源：离线测试'
+    captured=cmd('capture_current')
+    assert captured['state']=='Captured' and captured['captures']==count+1,captured
+    report['cases'].append('offline fixture disconnects the static source and captures without another network request')
     # The simulator can still send continuously; the session must only buffer it.
     cmd('disconnect');source(stop=True);proc.wait(timeout=5);proc=None
     CONTROL=ROOT/'reports/pose_editing_static_source'/(RUN+'_stream')
@@ -134,6 +153,7 @@ try:
     before=cmd('status');held_keys=channels();held_pose=cmd('pose_report',ok=None)
     cmd('connect');ready=pump(lambda s:s['state']=='Ready' and s.get('received',0)>=10)
     assert not ready['static_source']
+    assert ready['source_label']=='数据来源：模拟器',ready
     assert ready['applied']==before['applied'] and ready['captures']==before['captures']
     assert channels()==held_keys and cmd('pose_report',ok=None)==held_pose
     report['cases'].append('continuous simulator input only buffers until explicit capture')

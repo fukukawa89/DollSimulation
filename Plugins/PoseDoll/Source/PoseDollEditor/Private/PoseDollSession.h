@@ -37,6 +37,8 @@ public:
     void AfterUndoRedo();
     void ObserveObjectModified(UObject* Object);
     FString SnapshotLabel() const;
+    FString SourceLabel() const;
+    FString UserStatusLabel() const;
     FStaticWindow StaticWindow;
     FString StatusJson() const;
     FString DiagnosticText() const;
