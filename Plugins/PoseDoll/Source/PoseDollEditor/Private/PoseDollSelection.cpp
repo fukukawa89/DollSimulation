@@ -27,10 +27,16 @@ bool FSession::SetCustomParts(const TSet<FString>& Parts)
         {Error=TEXT("Unknown capture part: ")+Part;return false;}
     InvalidateSnapshotContext();CustomParts=Parts;Mask=TEXT("Custom");bValid=false;Error.Empty();return true;
 }
-void FSession::TogglePart(const FString& Part,bool Enabled)
+TSet<FString> FSession::GetSelectedParts() const
 {
+    if(Mask==TEXT("Custom"))return CustomParts;
     TSet<FString> Parts;
     if(Adapter)for(const auto& M:Adapter->GetMapping())if(IsMasked(M))Parts.Add(M.Semantic);
+    return Parts;
+}
+void FSession::TogglePart(const FString& Part,bool Enabled)
+{
+    TSet<FString> Parts=GetSelectedParts();
     if(Enabled)Parts.Add(Part);else Parts.Remove(Part);
     SetCustomParts(Parts);
 }

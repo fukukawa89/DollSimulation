@@ -19,6 +19,7 @@ public:
     void Disconnect();
     bool CaptureCurrent(int32 Advance=0,bool Linear=false);
     bool SetCustomParts(const TSet<FString>& Parts);
+    TSet<FString> GetSelectedParts() const;
     void TogglePart(const FString& Part,bool Enabled);
     static const TArray<TPair<FString,FString>>& PartOptions();
     static FString MaskLabel(const FString& Value);

@@ -1,18 +1,20 @@
 #include "Modules/ModuleManager.h"
 #include "PoseDollSession.h"
+#include "SPoseDollBodyPicker.h"
 #include "PoseDollEditorLibrary.h"
 #include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Widgets/Input/SButton.h"
-#include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/SWindow.h"
+#include "Framework/Application/SlateApplication.h"
 #include "SEditorViewport.h"
 #include "EditorViewportClient.h"
 #include "PreviewScene.h"
@@ -148,21 +150,6 @@ public:
         for (const TCHAR* M:{TEXT("FullBody"),TEXT("UpperBody"),TEXT("LowerBody"),TEXT("arm_l"),TEXT("arm_r"),TEXT("leg_l"),TEXT("leg_r"),TEXT("Custom")}) Masks.Add(MakeShared<FString>(M));
         Transitions.Add(MakeShared<FString>(TEXT("保持姿势")));
         Transitions.Add(MakeShared<FString>(TEXT("线性过渡")));
-        TSharedRef<SWrapBox> PartPicker=SNew(SWrapBox).UseAllottedSize(true);
-        for(const auto& Part:PoseDoll::FSession::PartOptions())
-        {
-            const FString Id=Part.Key,Label=Part.Value;
-            PartPicker->AddSlot().Padding(5,3)[SNew(SBox).WidthOverride(115)
-                [SNew(SCheckBox)
-                    .IsChecked_Lambda([Id]
-                    {
-                        const auto& S=PoseDoll::FSession::Get();
-                        if(S.Adapter)for(const auto& M:S.Adapter->GetMapping())if(M.Semantic==Id && S.IsMasked(M))return ECheckBoxState::Checked;
-                        return ECheckBoxState::Unchecked;
-                    })
-                    .OnCheckStateChanged_Lambda([Id](ECheckBoxState State){PoseDoll::FSession::Get().TogglePart(Id,State==ECheckBoxState::Checked);})
-                    [SNew(STextBlock).Text(FText::FromString(Label))]]];
-        }
         ChildSlot[SNew(SVerticalBox)
         +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SHorizontalBox)
             +SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("PoseDoll Lab")))]
@@ -177,14 +164,34 @@ public:
                 .Text_Lambda([]{return FText::FromString(PoseDoll::FSession::Get().SourceLabel());})]]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(STextBlock).AutoWrapText(true)
             .Text_Lambda([]{return FText::FromString(PoseDoll::FSession::Get().UserStatusLabel());})]
-        +SVerticalBox::Slot().FillHeight(1).Padding(4)[SNew(SPoseViewport)]
-        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
-            +SHorizontalBox::Slot().AutoWidth()[SessionButton(TEXT("绑定所选角色 / 当前序列"),TEXT("bind_selection"))]
-            +SHorizontalBox::Slot().AutoWidth().Padding(12,0,0,0).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("采集范围")))]
-            +SHorizontalBox::Slot().AutoWidth().Padding(8,0)[SNew(SComboBox<TSharedPtr<FString>>).OptionsSource(&Masks)
+        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SWrapBox).UseAllottedSize(true)
+            +SWrapBox::Slot().Padding(0,0,12,4)[SessionButton(TEXT("绑定所选角色 / 当前序列"),TEXT("bind_selection"))]
+            +SWrapBox::Slot().Padding(0,0,0,4)[SNew(SHorizontalBox)
+            +SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("采集范围")))]
+            +SHorizontalBox::Slot().AutoWidth().Padding(8,0)[SAssignNew(MaskCombo,SComboBox<TSharedPtr<FString>>).OptionsSource(&Masks)
                 .OnGenerateWidget_Lambda([](TSharedPtr<FString> M){return SNew(STextBlock).Text(FText::FromString(PoseDoll::FSession::MaskLabel(*M)));})
-                .OnSelectionChanged_Lambda([](TSharedPtr<FString> M,ESelectInfo::Type){if(M)UPoseDollEditorLibrary::SessionCommand(TEXT("mask"),*M);})
+                .OnSelectionChanged_Lambda([this](TSharedPtr<FString> M,ESelectInfo::Type)
+                {
+                    if(!M || bSyncingMask)return;
+                    UPoseDollEditorLibrary::SessionCommand(TEXT("mask"),*M);
+                })
                 [SNew(STextBlock).Text_Lambda([]{return FText::FromString(PoseDoll::FSession::MaskLabel(PoseDoll::FSession::Get().Mask));})]]]
+            +SWrapBox::Slot().Padding(0,0,12,4)
+                [SNew(SButton).Text(FText::FromString(TEXT("选择采集部位…")))
+                    .ToolTipText(FText::FromString(TEXT("打开骨骼图选择采集部位；关闭窗口后保留选择。")))
+                    .OnClicked_Lambda([this]{OpenBodyPicker();return FReply::Handled();})]
+            +SWrapBox::Slot().Padding(0,3,0,4)
+                [SNew(STextBlock)
+                    .Text_Lambda([]{return FText::FromString(FString::Printf(TEXT("已选 %d / %d 个部位"),
+                        PoseDoll::FSession::Get().GetSelectedParts().Num(),PoseDoll::FSession::PartOptions().Num()));})
+                    .ToolTipText_Lambda([]
+                    {
+                        const auto Selected=PoseDoll::FSession::Get().GetSelectedParts();
+                        TArray<FString> Labels;
+                        for(const auto& Part:PoseDoll::FSession::PartOptions())if(Selected.Contains(Part.Key))Labels.Add(Part.Value);
+                        return FText::FromString(Labels.IsEmpty()?TEXT("尚未选择部位"):FString::Join(Labels,TEXT("、")));
+                    })]]
+        +SVerticalBox::Slot().FillHeight(1).Padding(6)[SNew(SPoseViewport)]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SWrapBox).UseAllottedSize(true)
             +SWrapBox::Slot().Padding(0,0,12,6)[SNew(SHorizontalBox)
             +SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Text_Lambda([]{return FText::FromString(TEXT("采集")+PoseDoll::FSession::Get().SelectionLabel());}).OnClicked_Lambda([this]{Capture(0);return FReply::Handled();})]
@@ -198,13 +205,6 @@ public:
                     .OnGenerateWidget_Lambda([](TSharedPtr<FString> Option){return SNew(STextBlock).Text(FText::FromString(*Option));})
                     .OnSelectionChanged_Lambda([this](TSharedPtr<FString> Option,ESelectInfo::Type){if(Option)Linear=Option==Transitions[1];})
                     [SNew(STextBlock).Text_Lambda([this]{return FText::FromString(*Transitions[Linear?1:0]);})]]]]
-        +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SExpandableArea).InitiallyCollapsed(true)
-            .HeaderContent()[SNew(STextBlock).Text(FText::FromString(TEXT("自定义采集部位（仅替换关节转角）")))]
-            .BodyContent()[SNew(SVerticalBox)
-                +SVerticalBox::Slot().AutoHeight()[SNew(SHorizontalBox)
-                    +SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Text(FText::FromString(TEXT("清空选择"))).OnClicked_Lambda([]{PoseDoll::FSession::Get().SetCustomParts({});return FReply::Handled();})]
-                    +SHorizontalBox::Slot().AutoWidth().Padding(6,0)[SNew(SButton).Text(FText::FromString(TEXT("全选"))).OnClicked_Lambda([]{TSet<FString> Parts;for(const auto& P:PoseDoll::FSession::PartOptions())Parts.Add(P.Key);PoseDoll::FSession::Get().SetCustomParts(Parts);return FReply::Handled();})]]
-                +SVerticalBox::Slot().AutoHeight()[PartPicker]]]
         +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).AutoWrapText(true)
             .Text_Lambda([]{const auto& S=PoseDoll::FSession::Get();return FText::FromString((S.Sequence.IsValid()?TEXT("序列：")+S.Sequence->GetName():TEXT("尚未绑定序列"))+FString::Printf(TEXT("  · 已采集 %llu 次"),S.Captures));})]
         +SVerticalBox::Slot().AutoHeight().Padding(8,0,8,6)[SNew(STextBlock).AutoWrapText(true)
@@ -212,11 +212,69 @@ public:
             .Text_Lambda([]{return FText::FromString(PoseDoll::FSession::Get().EditingNote);})]
         ];
     }
-    ~SPosePanel() {PoseDoll::FSession::Get().Shutdown();}
+    virtual void Tick(const FGeometry& Geometry,double Time,float DeltaTime) override
+    {
+        SCompoundWidget::Tick(Geometry,Time,DeltaTime);
+        for(const auto& Item:Masks)
+        {
+            if(*Item==PoseDoll::FSession::Get().Mask && MaskCombo->GetSelectedItem()!=Item)
+            {
+                // Clicking the diagram also changes the preset. Keep the dropdown's real selection in sync.
+                TGuardValue<bool> Guard(bSyncingMask,true);
+                MaskCombo->SetSelectedItem(Item);
+                break;
+            }
+        }
+    }
+    ~SPosePanel()
+    {
+        if(const auto Window=PartWindow.Pin())Window->RequestDestroyWindow();
+        PoseDoll::FSession::Get().Shutdown();
+    }
 private:
+    void OpenBodyPicker()
+    {
+        if(const auto Existing=PartWindow.Pin())
+        {
+            Existing->BringToFront();
+            return;
+        }
+        const TSharedRef<SWindow> Window=SNew(SWindow)
+            .Title(FText::FromString(TEXT("自定义采集部位")))
+            .ClientSize(FVector2D(620,620)).MinWidth(420.f).MinHeight(400.f)
+            .SupportsMaximize(false).SupportsMinimize(false);
+        PartWindow=Window;
+        const TWeakPtr<SWindow> WeakWindow=Window;
+        Window->SetOnWindowClosed(FOnWindowClosed::CreateSP(this,&SPosePanel::OnBodyPickerClosed));
+        Window->SetContent(SNew(SVerticalBox)
+            +SVerticalBox::Slot().AutoHeight().Padding(12,12,12,8)
+                [SNew(STextBlock).AutoWrapText(true)
+                    .Text(FText::FromString(TEXT("点击骨骼选择部位，修改即时生效；关闭窗口后保留选择。")))]
+            +SVerticalBox::Slot().FillHeight(1).Padding(8,0)
+                [SNew(SScrollBox)+SScrollBox::Slot()[SNew(PoseDoll::SPoseDollBodyPicker)]]
+            +SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(12)
+                [SNew(SButton).Text(FText::FromString(TEXT("完成")))
+                    .OnClicked_Lambda([WeakWindow]
+                    {
+                        if(const auto OpenWindow=WeakWindow.Pin())OpenWindow->RequestDestroyWindow();
+                        return FReply::Handled();
+                    })]);
+        // A non-modal child keeps the main capture controls available and shares the session selection.
+        if(const auto Parent=FSlateApplication::Get().FindWidgetWindow(AsShared()))
+            FSlateApplication::Get().AddWindowAsNativeChild(Window,Parent.ToSharedRef());
+        else
+            FSlateApplication::Get().AddWindow(Window);
+    }
+    void OnBodyPickerClosed(const TSharedRef<SWindow>& Window)
+    {
+        if(PartWindow.Pin()==Window)PartWindow.Reset();
+    }
     void Capture(int32 Advance)
     {PoseDoll::FSession::Get().CaptureCurrent(Advance,Linear);}
     TArray<TSharedPtr<FString>> Masks,Transitions;int32 Step=4;bool Linear=false;
+    TWeakPtr<SWindow> PartWindow;
+    TSharedPtr<SComboBox<TSharedPtr<FString>>> MaskCombo;
+    bool bSyncingMask=false;
 };
 }
 class FPoseDollEditorModule : public IModuleInterface
