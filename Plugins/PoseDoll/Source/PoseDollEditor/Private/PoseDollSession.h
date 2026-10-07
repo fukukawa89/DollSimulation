@@ -32,7 +32,7 @@ public:
     bool BindSelection();
     bool Capture(int32 Frame,int32 Advance=0,bool Linear=false);
     bool RequestSnapshot(bool WriteKeys=false,int32 Advance=0,bool Linear=false);
-    void CancelSnapshot(const FString& Reason=TEXT("Cancelled by user"));
+    void CancelSnapshot(const FString& Reason);
     void InvalidateSnapshotContext();
     void AfterUndoRedo();
     void ObserveObjectModified(UObject* Object);

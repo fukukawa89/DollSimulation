@@ -90,13 +90,12 @@ def run():
     report['mask_preserved_lower_body']=True;report['static_clutch_committed']=True
     count=cmd('status')['captures']
     # Changes during request invalidate it before any write.
-    for change in ('time','mask','undo','cancel','target'):
+    for change in ('time','mask','undo','target'):
         unreal.LevelSequenceEditorBlueprintLibrary.set_current_time(40)
         cmd('snapshot_capture')
         if change=='time':unreal.LevelSequenceEditorBlueprintLibrary.set_current_time(41)
         elif change=='mask':cmd('mask','UpperBody')
         elif change=='undo':cmd('undo')
-        elif change=='cancel':cmd('snapshot_cancel')
         elif change=='target':assert unreal.PoseDollEditorLibrary.bind_target(sequence,actor.skeletal_mesh_component)
         cmd('tick');s=cmd('status');assert s['captures']==count and s['snapshot_state']=='Cancelled',(change,s)
         cmd('mask','FullBody')

@@ -64,11 +64,11 @@ try:
     before=cmd('status')
     assert before['capture_mode']=='OneShot' and 'live' not in before
     assert before['applied']==0
-    for action in ('resume','freeze','snapshot_clutch','contact','placement'):
+    for action in ('resume','freeze','snapshot_clutch','contact','placement','snapshot_cancel'):
         rejected=cmd(action,ok=False)
         assert rejected['error']=='Unknown session action',(action,rejected)
     assert cmd('status')['applied']==0 and channels()==initial
-    report['cases'].append('retired continuous/Clutch/contact/placement commands cannot apply or key a pose')
+    report['cases'].append('retired session commands cannot apply or key a pose')
     cid=cmd('capture_current',{'advance':4})['capture_id']
     assert cmd('capture_current',{'advance':4})['capture_id']==cid
     accepted=pump(lambda s:s['snapshot_state'] in ('Committed','Fault','Cancelled','TimedOut'))
@@ -92,7 +92,7 @@ try:
     assert all(after[n]==v for n,v in keys.items() if not n.startswith('hand_l_fk_ctrl'))
     report['cases'].append('static wrist-only capture changes only selected FK rotation channels')
     count=cmd('status')['captures']
-    for change in ('manual_edit','time','mask','cancel','target','disconnect'):
+    for change in ('manual_edit','time','mask','target','disconnect'):
         cmd('capture_current')
         if change=='manual_edit':
             rig=unreal.ControlRigSequencerLibrary.get_control_rigs(seq)[0].control_rig
@@ -103,7 +103,6 @@ try:
                 unreal.ControlRigSequencerLibrary.set_local_control_rig_euler_transform(seq,rig,'hand_r_fk_ctrl',frame,v,set_key=True)
         elif change=='time':unreal.LevelSequenceEditorBlueprintLibrary.set_current_time(17)
         elif change=='mask':cmd('custom_parts',{'parts':['hand_r']})
-        elif change=='cancel':cmd('snapshot_cancel')
         elif change=='target':assert unreal.PoseDollEditorLibrary.bind_target(seq,actor.skeletal_mesh_component)
         elif change=='disconnect':cmd('disconnect')
         expected=channels()

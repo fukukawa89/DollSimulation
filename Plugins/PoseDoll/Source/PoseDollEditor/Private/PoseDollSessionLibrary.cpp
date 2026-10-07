@@ -39,7 +39,6 @@ FString UPoseDollEditorLibrary::SessionCommand(const FString& Action,const FStri
         if(!Argument.IsEmpty()&&!PoseDoll::ReadJson(Argument,O,E)){Ok=false;S.Error=E;}
         else{if(O){O->TryGetNumberField(TEXT("advance"),Advance);O->TryGetBoolField(TEXT("linear"),Linear);}Ok=S.RequestSnapshot(Action==TEXT("snapshot_capture"),Advance,Linear);}
     }
-    else if(Action==TEXT("snapshot_cancel"))S.CancelSnapshot();
     else if (Action==TEXT("capture"))
     {
         TSharedPtr<FJsonObject> O;FString Error;
@@ -47,8 +46,8 @@ FString UPoseDollEditorLibrary::SessionCommand(const FString& Action,const FStri
         else {int32 Frame=ULevelSequenceEditorBlueprintLibrary::GetGlobalPosition().Frame.FrameNumber.Value,Advance=0;bool Linear=false;O->TryGetNumberField(TEXT("frame"),Frame);O->TryGetNumberField(TEXT("advance"),Advance);O->TryGetBoolField(TEXT("linear"),Linear);Ok=S.Capture(Frame,Advance,Linear);}
     }
     else if (Action==TEXT("tick")) S.Tick(0);
-    else if (Action==TEXT("undo")) {S.CancelSnapshot();GEditor->UndoTransaction();}
-    else if (Action==TEXT("redo")) {S.CancelSnapshot();GEditor->RedoTransaction();}
+    else if (Action==TEXT("undo")) {S.CancelSnapshot(TEXT("Undo requested"));GEditor->UndoTransaction();}
+    else if (Action==TEXT("redo")) {S.CancelSnapshot(TEXT("Redo requested"));GEditor->RedoTransaction();}
     else if (Action==TEXT("open_panel")) FGlobalTabmanager::Get()->TryInvokeTab(FName(TEXT("PoseDollLab")));
     else if (Action==TEXT("close_panel")) {auto Tab=FGlobalTabmanager::Get()->FindExistingLiveTab(FName(TEXT("PoseDollLab")));if (Tab) Tab->RequestCloseTab();}
     else if (Action!=TEXT("status")) {Ok=false;S.Error=TEXT("Unknown session action");}

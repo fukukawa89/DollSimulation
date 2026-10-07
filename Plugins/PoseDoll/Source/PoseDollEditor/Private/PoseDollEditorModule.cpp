@@ -118,8 +118,7 @@ public:
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("连接静态人偶"),TEXT("connect"),TEXT("static"))]
             +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("连接模拟器"),TEXT("connect"))]
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("断开"),TEXT("disconnect"))]
-            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("取消采集"),TEXT("snapshot_cancel"))]]
+            +SHorizontalBox::Slot().AutoWidth()[Button(TEXT("断开"),TEXT("disconnect"))]]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(STextBlock).AutoWrapText(true).Text_Lambda([]{return FText::FromString(PoseDoll::FSession::Get().SnapshotLabel());})]
         +SVerticalBox::Slot().FillHeight(1).Padding(4)[SNew(SPoseViewport)]
         +SVerticalBox::Slot().AutoHeight().Padding(6)[SNew(SHorizontalBox)

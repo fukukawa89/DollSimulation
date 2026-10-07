@@ -34,8 +34,9 @@ try:
   cmd('connect','static');wait(lambda s:s.get('static_source') and s['state']=='Ready')
   unreal.LevelSequenceEditorBlueprintLibrary.set_current_time(10+idx*5);before=cmd('status')['captures']
   for _ in range(5 if case=='many' else 1):
-   cmd('snapshot_capture');time.sleep(.04);cmd('snapshot_cancel')
-  # New command goes immediately after cancel; no waiting for TCP drain.
+   cmd('snapshot_capture');time.sleep(.04)
+   cmd('mask','UpperBody');cmd('mask','FullBody')
+  # New command follows automatic mask-change cancellation; no waiting for TCP drain.
   new=cmd('snapshot_capture')['capture_id']
   s=wait(lambda s:s['snapshot_state'] in ('Committed','Fault','Cancelled','TimedOut'))
   healthy=case not in ('unknown','crc','boot')
